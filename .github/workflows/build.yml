@@ -13,29 +13,31 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      # ubuntu-latest runners already ship an Android SDK under $ANDROID_HOME,
-      # but cmdline-tools/*/bin (where sdkmanager lives) is not on PATH by
-      # default. android-actions/setup-android@v3 also tries to install the
-      # long-removed legacy `tools` package and fails, so we locate the
-      # preinstalled sdkmanager ourselves instead of using that action.
+      # Rather than rely on whatever Android SDK layout (if any) a given
+      # ubuntu-latest image happens to preinstall -- android-actions/setup-
+      # android@v3 tries to install the long-removed legacy `tools` package
+      # and fails, and the preinstalled-SDK path guessing was fragile too --
+      # fetch Google's official cmdline-tools zip directly into a fresh
+      # $HOME/android-sdk. This is slower but reproducible.
       - name: Install SDK platform, build-tools and NDK
         run: |
           set -eu
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          echo "SDK_ROOT=$SDK_ROOT"
+          SDK_ROOT="$HOME/android-sdk"
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          curl -fsSL -o cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
+          unzip -q cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
+          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/28.0.13004108" >> "$GITHUB_ENV"
-          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | sort -V | tail -1)
-          if [ -z "$SDKMANAGER" ]; then
-            echo "::error::sdkmanager not found under $SDK_ROOT/cmdline-tools"
-            find "$SDK_ROOT" -maxdepth 3
-            exit 1
-          fi
-          echo "Using $SDKMANAGER"
-          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0" "ndk;28.0.13004108"
+          "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0" "ndk;28.0.13004108" "platform-tools"
       - run: chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
