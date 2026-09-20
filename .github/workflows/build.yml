@@ -37,7 +37,7 @@ jobs:
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0" "ndk;28.0.13004108" "platform-tools"
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "ndk;28.0.13004108" "platform-tools"
       - run: chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:

@@ -2,14 +2,20 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdk 37
+    // NOTE: compileSdk/targetSdk 37 (Android 17) needs AGP 9.4+ / Gradle 9.6+
+    // and the new minor-versioned platform packages (platforms;android-37.x).
+    // Staying on 36 for now to keep the AGP 8.x toolchain; the Android-17
+    // runtime compatibility fixes below (predictive back, 16KB pages, root
+    // exec) don't depend on this value and already apply on Android 17
+    // devices. Bump to 37 + AGP 9.4 once this is verified working.
+    compileSdk 36
     ndkVersion "28.0.13004108"
 
     namespace "com.google.android.diskusage"
 
     defaultConfig {
         applicationId "com.google.android.diskusage"
-        targetSdkVersion 37
+        targetSdkVersion 36
         minSdk 21
     }
     buildFeatures {
