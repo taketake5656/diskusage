@@ -27,7 +27,7 @@
                  android:theme="@style/Theme"
                  android:hardwareAccelerated="true"
                  android:requestLegacyExternalStorage="true">
-        <activity android:name=".ui.SelectActivity">
+        <activity android:name=".ui.SelectActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -36,7 +36,7 @@
     <activity android:name=".ui.DiskUsage"
         android:theme="@style/Theme.NoBackground"
               android:hardwareAccelerated="false"
-              android:windowSoftInputMode="adjustResize" android:exported="true">
+              android:windowSoftInputMode="adjustResize" android:exported="false">
     </activity>
     <activity android:name=".ui.PermissionRequestActivity"/>
     <activity android:name=".ui.DeleteActivity"/>

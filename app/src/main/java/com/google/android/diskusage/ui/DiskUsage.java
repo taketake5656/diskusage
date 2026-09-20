@@ -32,6 +32,7 @@ import android.os.Bundle;
 import android.os.FileUriExposedException;
 import android.os.Handler;
 import android.provider.Settings;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 import androidx.lifecycle.ViewModelProvider;
@@ -99,6 +100,14 @@ public class DiskUsage extends LoadableActivity {
     ActivityCommonBinding binding = ActivityCommonBinding.inflate(getLayoutInflater());
     setContentView(binding.getRoot());
     menu.onCreate(viewModel);
+    // KEYCODE_BACK is no longer delivered when predictive back is enabled
+    // (default when targeting API 36+), so handle back via the dispatcher.
+    getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+      @Override
+      public void handleOnBackPressed() {
+        finishOnBack();
+      }
+    });
     Intent i = getIntent();
 
 

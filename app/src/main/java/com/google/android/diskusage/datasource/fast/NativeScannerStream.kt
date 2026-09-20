@@ -1,7 +1,7 @@
 package com.google.android.diskusage.datasource.fast
 
 import com.google.android.diskusage.utils.AppHelper.appContext
-import com.google.android.diskusage.utils.DeviceHelper.isDeviceRooted
+import com.google.android.diskusage.utils.RootShell
 import org.jetbrains.annotations.Contract
 import java.io.IOException
 import java.io.InputStream
@@ -49,19 +49,13 @@ class NativeScannerStream(private val process: Process) :
         @Contract("_, _ -> new")
         @Throws(IOException::class, InterruptedException::class)
         private fun runScanner(root: String, rootRequired: Boolean): NativeScannerStream {
-            val process = if (!(rootRequired && isDeviceRooted())) {
+            val process = if (!rootRequired) {
                 Runtime.getRuntime().exec(arrayOf(libscanPath, root))
             } else {
-                arrayOf("su", "/system/bin/su", "/system/xbin/su").firstNotNullOf { su ->
-                    runCatching {
-                        Runtime.getRuntime().exec(arrayOf(su))
-                    }.getOrNull()
-                }.also {
-                    it.outputStream.use { o ->
-                        o.write("$libscanPath $root".toByteArray())
-                        o.flush()
-                    }
-                }
+                val su = RootShell.findSu()
+                    ?: throw IOException("Root access is unavailable or was denied. Grant superuser access to DiskUsage.")
+                val command = "${RootShell.shellQuote(libscanPath)} ${RootShell.shellQuote(root)}"
+                Runtime.getRuntime().exec((su + listOf("-c", command)).toTypedArray())
             }
             return NativeScannerStream(process)
         }

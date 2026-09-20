@@ -19,6 +19,10 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := scan
 LOCAL_SRC_FILES := scan.c
 
+# Android 15+ devices may use 16 KB memory pages; ELF segments must be
+# aligned accordingly or the binary fails to load.
+LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384
+
 # It seems that Google will not allow to run executable from app private
 # directory like `/data/data` or /data/user/0` since Android 10. A workaround
 # for this is that renaming executable like `libxxx.so`, and Gradle build
