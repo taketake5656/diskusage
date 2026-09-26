@@ -2,12 +2,19 @@ name: Build
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      # Creating releases for version tags
+      contents: write
+    env:
+      KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,15 +46,32 @@ jobs:
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" "platforms;android-37.0" "ndk;29.0.14206865" "cmake;4.1.2" "platform-tools"
 
+      # Release builds are signed only when the key is configured in the
+      # repository secrets, so builds of forks and pull requests stay unsigned.
+      - name: Set up release signing
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "ORG_GRADLE_PROJECT_diskusageKeystoreFile=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build, test and lint
-        run: ./gradlew assembleDebug testDebugUnitTest lintDebug
+        env:
+          ORG_GRADLE_PROJECT_diskusageKeystorePassword: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_diskusageKeyAlias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_diskusageKeyPassword: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleDebug assembleRelease testDebugUnitTest lintDebug
 
       - uses: actions/upload-artifact@v4
         with:
           name: diskusage-debug
           path: app/build/outputs/apk/debug/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diskusage-release
+          path: app/build/outputs/apk/release/*.apk
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -56,3 +80,17 @@ jobs:
           path: |
             app/build/reports/
             app/build/test-results/
+
+      - name: Check the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -eu
+          test -n "$KEYSTORE_BASE64" || { echo "::error::Release signing key is not configured"; exit 1; }
+          VERSION=$(jq -r '.elements[0].versionName' app/build/outputs/apk/release/output-metadata.json)
+          test "v$VERSION" = "$GITHUB_REF_NAME" || { echo "::error::Version $VERSION doesn't match tag $GITHUB_REF_NAME"; exit 1; }
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          body_path: .github/release-notes/${{ github.ref_name }}.md
+          files: app/build/outputs/apk/release/*.apk

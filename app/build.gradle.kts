@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// Release signing key, from ~/.gradle/gradle.properties or ORG_GRADLE_PROJECT_* variables.
+// Release builds are unsigned without it.
+val releaseKeystoreFile = providers.gradleProperty("diskusageKeystoreFile").orNull
+
 android {
     namespace = "com.google.android.diskusage"
     compileSdk = 37
@@ -12,8 +16,9 @@ android {
         applicationId = "com.google.android.diskusage"
         minSdk = 23
         targetSdk = 37
-        versionCode = 5001
-        versionName = "5.0-alpha1"
+        // major * 10000 + minor * 100 + patch
+        versionCode = 10000
+        versionName = "1.0.0"
     }
 
     buildFeatures {
@@ -26,10 +31,23 @@ android {
         generateLocaleConfig = true
     }
 
+    signingConfigs {
+        if (releaseKeystoreFile != null) {
+            create("release") {
+                storeFile = file(releaseKeystoreFile)
+                storePassword = providers.gradleProperty("diskusageKeystorePassword").get()
+                keyAlias = providers.gradleProperty("diskusageKeyAlias").get()
+                keyPassword = providers.gradleProperty("diskusageKeyPassword").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
