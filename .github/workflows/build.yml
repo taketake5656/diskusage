@@ -1,0 +1,58 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # JDK 21 runs the Gradle daemon (gradle/gradle-daemon-jvm.properties),
+      # JDK 17 is the toolchain the app is compiled with.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+
+      # The Android SDK layout of the runner images isn't reliable, so install
+      # Google's official cmdline-tools into a fresh SDK root.
+      - name: Install Android SDK
+        run: |
+          set -eu
+          SDK_ROOT="$HOME/android-sdk"
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          curl -fsSL -o cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
+          unzip -q cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
+          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-37.0" "ndk;29.0.14206865" "cmake;4.1.2" "platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, test and lint
+        run: ./gradlew assembleDebug testDebugUnitTest lintDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diskusage-debug
+          path: app/build/outputs/apk/debug/*.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
