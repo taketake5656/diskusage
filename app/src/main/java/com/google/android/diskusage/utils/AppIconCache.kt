@@ -111,7 +111,7 @@ object AppIconCache: CoroutineScope by MainScope() {
                 view.setImageBitmap(bitmap)
             } else {
                 if (Build.VERSION.SDK_INT >= 26) {
-                    view.setImageResource(R.drawable.icon)
+                    view.setImageResource(R.mipmap.ic_launcher)
                 } else {
                     view.setImageDrawable(null)
                 }
