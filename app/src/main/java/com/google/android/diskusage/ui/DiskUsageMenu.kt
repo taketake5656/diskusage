@@ -178,7 +178,7 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
                 Html.fromHtml(
                     diskusage.getString(
                         R.string.about_view_source_code,
-                        "<b><a href=\"https://github.com/IvanVolosyuk/diskusage\">GitHub</a></b>"
+                        "<b><a href=\"https://github.com/taketake5656/diskusage\">GitHub</a></b>"
                     ),
                     Html.FROM_HTML_MODE_LEGACY
                 )
@@ -187,7 +187,7 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
                 Html.fromHtml(
                     diskusage.getString(
                         R.string.about_view_source_code,
-                        "<b><a href=\"https://github.com/IvanVolosyuk/diskusage\">GitHub</a></b>"
+                        "<b><a href=\"https://github.com/taketake5656/diskusage\">GitHub</a></b>"
                     )
                 )
             }

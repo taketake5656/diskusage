@@ -233,10 +233,17 @@ class DiskUsage : LoadableActivity() {
 
         val path = entry.absolutePath()
         val file = File(path)
-        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".provider", file)
-        } else {
-            file.toUri()
+        val uri = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".provider", file)
+            } else {
+                file.toUri()
+            }
+        } catch (e: IllegalArgumentException) {
+            // Not covered by provider_paths.xml
+            Timber.e(e, "Can't share %s", path)
+            toast(R.string.no_viewer_found)
+            return
         }
 
         if (file.isDirectory) {
