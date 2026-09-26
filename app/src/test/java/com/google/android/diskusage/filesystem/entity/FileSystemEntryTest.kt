@@ -74,11 +74,11 @@ class FileSystemEntryTest {
     fun geometry() {
         assertEquals(3, superRoot.depth(a2))
         assertEquals(0, superRoot.getOffset(root))
-        assertEquals(dirA.getSizeForRendering(), superRoot.getOffset(c))
-        assertEquals(a1.getSizeForRendering(), superRoot.getOffset(a2))
-        assertSame(a2, superRoot.findEntry(3, a1.getSizeForRendering() + 1))
-        assertSame(c, superRoot.findEntry(2, dirA.getSizeForRendering() + 1))
-        assertEquals(7, root.getNumFiles())
+        assertEquals(dirA.sizeForRendering, superRoot.getOffset(c))
+        assertEquals(a1.sizeForRendering, superRoot.getOffset(a2))
+        assertSame(a2, superRoot.findEntry(3, a1.sizeForRendering + 1))
+        assertSame(c, superRoot.findEntry(2, dirA.sizeForRendering + 1))
+        assertEquals(7, root.numFiles)
     }
 
     @Test
@@ -102,6 +102,15 @@ class FileSystemEntryTest {
         assertEquals(listOf("a1.bin"), filteredRoot.children!![0].children!!.map { it.name })
         assertEquals(110, filtered.sizeInBlocks)
         assertNull(superRoot.filter("nothing", BLOCK_SIZE))
+    }
+
+    @Test
+    fun siblings() {
+        assertSame(c, dirA.next)
+        assertSame(dirB, c.next)
+        assertSame(dirB, dirB.next)
+        assertSame(dirA, dirA.prev)
+        assertSame(c, dirB.prev)
     }
 
     @Test

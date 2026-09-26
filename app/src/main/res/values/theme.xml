@@ -4,4 +4,6 @@
     <style name="Theme.NoBackground" parent="Theme.AppCompat">
         <item name="android:windowBackground">@null</item>
     </style>
+    <style name="Theme.Settings" parent="Theme.AppCompat">
+    </style>
 </resources>

@@ -2,7 +2,6 @@ package com.google.android.diskusage.ui
 
 import android.app.AlertDialog
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
@@ -13,6 +12,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.SearchView
+import androidx.core.graphics.toColorInt
 import androidx.core.view.forEach
 import com.google.android.diskusage.R
 import com.google.android.diskusage.databinding.AboutDialogBinding
@@ -41,8 +41,13 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
 //        actionBar.setDisplayHomeAsUpEnabled(true)
     }
 
+    /** Closes the search first, if it is open. */
     fun readyToFinish(): Boolean {
-        return true
+        val searchView = searchView
+        if (searchView == null || searchView.isIconified) return true
+        searchView.setQuery("", false)
+        searchView.isIconified = true
+        return false
     }
 
     fun searchRequest() {
@@ -66,7 +71,7 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
                 it.setOnCloseListener {
                     Timber.d("Search process closed")
                     searchPattern = null
-                    diskusage.applyPatternNewRoot(masterRoot, null)
+                    diskusage.applyPatternNewRoot(masterRoot)
                     false
                 }
                 it.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -115,11 +120,11 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
     fun finishedSearch(newRoot: FileSystemSuperRoot?, searchQuery: String?): Boolean {
         return if (newRoot != null) {
             searchView?.background = origSearchBackground
-            diskusage.applyPatternNewRoot(newRoot, searchQuery)
+            diskusage.applyPatternNewRoot(newRoot)
             true
         } else {
-            searchView?.setBackgroundColor(Color.parseColor("#FFDDDD"))
-            diskusage.applyPatternNewRoot(masterRoot, searchQuery)
+            searchView?.setBackgroundColor("#FFDDDD".toColorInt())
+            diskusage.applyPatternNewRoot(masterRoot)
             false
         }
     }
@@ -133,9 +138,7 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         setupSearchMenuItem(menu)
 
         menu.item(R.string.button_show, showAsAction = true) {
-            if (selectedEntity != null) {
-                diskusage.view(selectedEntity)
-            }
+            selectedEntity?.let { diskusage.view(it) }
         }.apply {
             viewModel.showButton.observe(diskusage) {
                 isVisible = it
@@ -151,7 +154,7 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         }
 
         menu.item(R.string.button_delete) {
-            diskusage.askForDeletion(selectedEntity!!)
+            selectedEntity?.let { diskusage.askForDeletion(it) }
         }.apply {
             viewModel.deleteButton.observe(diskusage) {
                 isVisible = it
@@ -219,37 +222,37 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
     }
 
     private fun updateMenu() {
-        if (diskusage.fileSystemState == null) {
+        val state = diskusage.fileSystemState
+        if (state == null) {
             viewModel.hideToolBarActionButton()
             return
         }
 
-        if (diskusage.fileSystemState.sdcardIsEmpty()) {
-            viewModel.hideToolBarActionButton()
-            viewModel.enableRescanButton()
-        }
-
+        viewModel.enableRescanButton()
         viewModel.showToolbarActionButton()
 
-        val isGPU = diskusage.fileSystemState.isGPU
-        val title = if (isGPU) {
+        val title = if (state.isGPU) {
             diskusage.getString(R.string.software_renderer)
         } else {
             diskusage.getString(R.string.hardware_renderer)
         }
         viewModel.setRendererButtonTitle(title)
 
-        val view = !(selectedEntity === diskusage.fileSystemState.masterRoot.children[0]
-                || selectedEntity is FileSystemSpecial)
+        val selected = selectedEntity
+        val view = selected != null &&
+            selected !== state.masterRoot.children?.get(0) &&
+            selected !is FileSystemSpecial
         if (view) {
-            viewModel.enableRescanButton()
+            viewModel.enableShowButton()
         } else {
             viewModel.disableShowButton()
         }
 
-        val fileOrNotSearching = searchPattern == null || selectedEntity!!.children == null
-        val mountPoint = MountPoint.getForKey(diskusage, diskusage.getKey())
-        if (view && selectedEntity!!.isDeletable && fileOrNotSearching && mountPoint.isDeleteSupported) {
+        val fileOrNotSearching = searchPattern == null || selected?.children == null
+        val mountPoint = MountPoint.getForKey(diskusage, diskusage.key)
+        if (view && selected.isDeletable && fileOrNotSearching &&
+            mountPoint?.isDeleteSupported == true
+        ) {
             viewModel.enableDeleteButton()
         } else {
             viewModel.disableDeleteButton()

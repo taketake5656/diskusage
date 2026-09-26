@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -7,9 +8,12 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="29"/>
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <uses-permission android:name="android.permission.GET_PACKAGE_SIZE"/>
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>
+    <!-- Storage usage of all the apps is displayed -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Granted by the user in the usage access settings -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
     <supports-screens android:smallScreens="true"
                   android:anyDensity="true"
                   android:normalScreens="true"
@@ -40,7 +44,8 @@
     </activity>
     <activity android:name=".ui.PermissionRequestActivity"/>
     <activity android:name=".ui.DeleteActivity"/>
-    <activity android:name=".ui.ShowHideMountPointsActivity"/>
+    <activity android:name=".ui.ShowHideMountPointsActivity"
+        android:theme="@style/Theme.Settings"/>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
