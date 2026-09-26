@@ -187,7 +187,8 @@ public class NativeScanner implements ProgressGenerator {
 
   public FileSystemEntry scan(@NonNull MountPoint mountPoint) throws IOException, InterruptedException {
     is = NativeScannerStream.Factory.create(mountPoint.getRoot(), mountPoint.isRootRequired());
-    // while (getByte() != 0);
+    // Skip anything printed before the start marker (e.g. by su)
+    while (getByte() != 0);
 
     Type type = getType();
     if (type != Type.DIR) throw new RuntimeException("Error: no mount point");

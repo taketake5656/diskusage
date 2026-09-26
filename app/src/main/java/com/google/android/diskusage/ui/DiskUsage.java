@@ -32,8 +32,12 @@ import android.os.Bundle;
 import android.os.FileUriExposedException;
 import android.os.Handler;
 import android.provider.Settings;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import android.util.Log;
@@ -99,6 +103,14 @@ public class DiskUsage extends LoadableActivity {
     ActivityCommonBinding binding = ActivityCommonBinding.inflate(getLayoutInflater());
     setContentView(binding.getRoot());
     menu.onCreate(viewModel);
+    applyWindowInsets();
+    // KEYCODE_BACK is no longer dispatched to views with predictive back
+    getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+      @Override
+      public void handleOnBackPressed() {
+        finishOnBack();
+      }
+    });
     Intent i = getIntent();
 
 
@@ -118,6 +130,19 @@ public class DiskUsage extends LoadableActivity {
     Timber.d("DiskUsage.onCreate(), rootPath = %s, receivedState = %s",
             mountPoint.getRoot(), receivedState);
     if (receivedState != null) onRestoreInstanceState(receivedState);
+  }
+
+  /**
+   * Since targetSdk 35 the window is always laid out edge-to-edge, and the content
+   * is drawn below the system bars. Keep the graph out of them.
+   */
+  private void applyWindowInsets() {
+    ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
+      Insets bars = insets.getInsets(
+          WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+      v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+      return insets;
+    });
   }
 
   ArrayList<Runnable> afterLoadAction = new ArrayList<>();
@@ -519,6 +544,7 @@ public class DiskUsage extends LoadableActivity {
       rootElement = scanner.scan(mountPoint);
       handler.removeCallbacks(progressUpdater);
     } catch (RuntimeException e) {
+      Timber.w(e, "Native scanner failed, falling back to Java scanner");
       final Scanner scanner = new Scanner(20, stats.blockSize, stats.busyBlocks, heap);
       progressUpdater = makeProgressUpdater(scanner, stats);
       handler.post(progressUpdater);

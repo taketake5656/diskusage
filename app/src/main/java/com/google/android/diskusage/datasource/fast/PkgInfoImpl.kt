@@ -9,5 +9,5 @@ class PkgInfoImpl(private val info: PackageInfo, private val pm: PackageManager)
     override val packageName: String
         get() = info.packageName
     override val applicationInfo: AppInfo
-        get() = AppInfoImpl(info.applicationInfo, pm)
+        get() = AppInfoImpl(requireNotNull(info.applicationInfo), pm)
 }

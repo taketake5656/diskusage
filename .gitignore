@@ -5,3 +5,5 @@
 /local.properties
 /DiskUsage.iml
 /app/app.iml
+/app/.cxx
+/.kotlin

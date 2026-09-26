@@ -2,14 +2,15 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdk 34
-    ndkVersion "25.2.9519653"
+    compileSdk 37
+    // NDK r28+ links with 16 KB page alignment by default
+    ndkVersion "29.0.14206865"
 
     namespace "com.google.android.diskusage"
 
     defaultConfig {
         applicationId "com.google.android.diskusage"
-        targetSdkVersion 30
+        targetSdk 37
         minSdk 21
     }
     buildFeatures {
@@ -17,11 +18,11 @@ android {
         viewBinding true
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     sourceSets {
         main {
@@ -37,9 +38,17 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
+    packaging {
+        jniLibs {
+            // libscan.so is an executable launched from nativeLibraryDir,
+            // so native libraries must be extracted on install.
+            useLegacyPackaging true
+        }
+    }
     externalNativeBuild {
-        ndkBuild {
-            path file('src/main/jni/Android.mk')
+        cmake {
+            path file('src/main/jni/CMakeLists.txt')
+            version "4.1.2"
         }
     }
 }
