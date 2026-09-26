@@ -538,7 +538,7 @@ public class DiskUsage extends LoadableActivity {
     FileSystemEntry rootElement;
     Runnable progressUpdater;
     try {
-      final NativeScanner scanner = new NativeScanner(this, stats.blockSize, stats.busyBlocks, heap);
+      final NativeScanner scanner = new NativeScanner(stats.blockSize, stats.busyBlocks, heap);
       progressUpdater = makeProgressUpdater(scanner, stats);
       handler.post(progressUpdater);
       rootElement = scanner.scan(mountPoint);

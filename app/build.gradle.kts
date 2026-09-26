@@ -42,6 +42,11 @@ android {
             version = "4.1.2"
         }
     }
+
+    testOptions {
+        // FileSystemEntry touches android.graphics in its static initializer
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 kotlin {

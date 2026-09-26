@@ -79,7 +79,6 @@ public class NativeScanner implements ProgressGenerator {
   }
 
   private InputStream is;
-  private final Context context;
 
   private static final int bufsize = 65536;
   private int offset = 0;
@@ -163,12 +162,11 @@ public class NativeScanner implements ProgressGenerator {
     }
   }
 
-  public NativeScanner(Context context, long blockSize, long allocatedBlocks, int maxHeap) {
+  public NativeScanner(long blockSize, long allocatedBlocks, int maxHeap) {
     this.blockSize = blockSize;
     this.blockSizeIn512Bytes = blockSize / 512;
     this.sizeThreshold = (allocatedBlocks << FileSystemEntry.blockOffset) / (maxHeap / 2);
     this.maxHeapSize = maxHeap;
-    this.context = context;
 //    this.blockAllowance = (allocatedBlocks << FileSystemEntry.blockOffset) / 2;
 //    this.blockAllowance = (maxHeap / 2) * sizeThreshold;
     Timber.d("NativeScanner: allocatedBlocks %s", allocatedBlocks);
@@ -186,7 +184,11 @@ public class NativeScanner implements ProgressGenerator {
   }
 
   public FileSystemEntry scan(@NonNull MountPoint mountPoint) throws IOException, InterruptedException {
-    is = NativeScannerStream.Factory.create(mountPoint.getRoot(), mountPoint.isRootRequired());
+    return scan(NativeScannerStream.Factory.create(mountPoint.getRoot(), mountPoint.isRootRequired()));
+  }
+
+  public FileSystemEntry scan(@NonNull InputStream stream) throws IOException {
+    is = stream;
     // Skip anything printed before the start marker (e.g. by su)
     while (getByte() != 0);
 
