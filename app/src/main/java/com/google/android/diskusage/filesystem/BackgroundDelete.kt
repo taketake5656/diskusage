@@ -142,7 +142,7 @@ class BackgroundDelete private constructor(
             val file = File(deleteRoot)
             val state = diskUsage.fileSystemState ?: return
             if (MountPoint.getMountPoints(diskUsage).any { "${it.root}/".startsWith("$deleteRoot/") }) {
-                longToast("This delete operation will erase entire storage - canceled.")
+                longToast(R.string.delete_whole_storage_canceled)
                 return
             }
             if (!file.exists()) {

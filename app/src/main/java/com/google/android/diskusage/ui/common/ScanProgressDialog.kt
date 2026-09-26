@@ -26,6 +26,7 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.StyleSpan
 import androidx.appcompat.app.AlertDialog
+import com.google.android.diskusage.R
 import com.google.android.diskusage.databinding.ProgressBinding
 import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import java.text.NumberFormat
@@ -147,7 +148,7 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
         }
         if (depth > 40 && !warned) {
             warned = true
-            setMessage("Cyclic dirs? Broken filesystem?")
+            setMessage(context.getString(R.string.cyclic_dirs_warning))
         }
     }
 

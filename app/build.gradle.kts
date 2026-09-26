@@ -21,6 +21,11 @@ android {
         viewBinding = true
     }
 
+    androidResources {
+        // Lets the user select the app language in the system settings
+        generateLocaleConfig = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

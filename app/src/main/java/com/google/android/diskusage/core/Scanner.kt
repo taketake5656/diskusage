@@ -36,7 +36,8 @@ class Scanner(
     blockSize: Long,
     allocatedBlocks: Long,
     maxHeap: Int,
-) : TreeScanner(blockSize, allocatedBlocks, maxHeap) {
+    smallEntryName: SmallEntryName = SmallEntryName.DEFAULT,
+) : TreeScanner(blockSize, allocatedBlocks, maxHeap, smallEntryName) {
 
     fun scan(file: LegacyFile): FileSystemEntry {
         val stat = try {

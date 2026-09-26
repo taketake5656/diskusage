@@ -25,6 +25,21 @@ import com.google.android.diskusage.filesystem.entity.FileSystemFile
 import java.util.PriorityQueue
 import timber.log.Timber
 
+/** Name of the entry which aggregates small files and directories. */
+fun interface SmallEntryName {
+    fun get(numDirs: Int, numFiles: Int): String
+
+    companion object {
+        val DEFAULT = SmallEntryName { numDirs, numFiles ->
+            when {
+                numDirs == 0 -> "<$numFiles files>"
+                numFiles == 0 -> "<$numDirs dirs>"
+                else -> "<$numDirs dirs and $numFiles files>"
+            }
+        }
+    }
+}
+
 /** Reports the scan progress. */
 interface ProgressGenerator {
     val lastCreatedFile: FileSystemEntry?
@@ -41,6 +56,7 @@ abstract class TreeScanner(
     protected val blockSize: Long,
     allocatedBlocks: Long,
     private val maxHeapSize: Int,
+    private val smallEntryName: SmallEntryName,
 ) : ProgressGenerator {
     protected val blockSizeIn512Bytes = blockSize / 512
     private val sizeThreshold = (allocatedBlocks shl FileSystemEntry.BLOCK_OFFSET) / (maxHeapSize / 2)
@@ -147,11 +163,7 @@ abstract class TreeScanner(
                 children += smallChildren
                 nodeHeapSize += heapSizeSmall
             } else {
-                val msg = when {
-                    numDirsSmall == 0 -> "<$numFilesSmall files>"
-                    numFilesSmall == 0 -> "<$numDirsSmall dirs>"
-                    else -> "<$numDirsSmall dirs and $numFilesSmall files>"
-                }
+                val msg = smallEntryName.get(numDirsSmall, numFilesSmall)
                 // for heap accounting
                 makeNode(node, msg)
                 smallFilesEntry = FileSystemEntrySmall(node, msg, numFilesSmall + numDirsSmall)

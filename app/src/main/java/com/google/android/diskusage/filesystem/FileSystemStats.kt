@@ -19,7 +19,9 @@
 
 package com.google.android.diskusage.filesystem
 
+import android.content.Context
 import android.os.StatFs
+import com.google.android.diskusage.R
 import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import com.google.android.diskusage.filesystem.mnt.MountPoint
 import timber.log.Timber
@@ -51,9 +53,10 @@ class FileSystemStats(mountPoint: MountPoint) {
         }
     }
 
-    fun formatUsageInfo(): String {
-        if (totalBlocks == 0L) return "Used <no information>"
-        return "Used %s of %s".format(
+    fun formatUsageInfo(context: Context): String {
+        if (totalBlocks == 0L) return context.getString(R.string.usage_info_unknown)
+        return context.getString(
+            R.string.usage_info,
             FileSystemEntry.calcSizeString(busyBlocks * blockSize),
             FileSystemEntry.calcSizeString(totalBlocks * blockSize),
         )

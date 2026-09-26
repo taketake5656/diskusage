@@ -110,7 +110,7 @@ abstract class LoadableActivity : AppCompatActivity() {
                 }
                 return@thread
             } catch (e: StackOverflowError) {
-                "Filesystem is damaged."
+                getString(R.string.filesystem_damaged)
             } catch (e: Exception) {
                 Timber.e(e, "loadFiles: Native error")
                 "${e.javaClass.name}:${e.message}"
@@ -163,7 +163,7 @@ abstract class LoadableActivity : AppCompatActivity() {
                 .setOnCancelListener { finish() }
                 .show()
         } catch (t: Throwable) {
-            toast("DiskUsage is out of memory. Sorry.")
+            toast(R.string.out_of_memory)
         }
     }
 

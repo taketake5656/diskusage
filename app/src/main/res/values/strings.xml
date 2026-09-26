@@ -18,85 +18,64 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  -->
 <resources>
+    <string name="title_for_path" translatable="false">%s</string>
+    <string name="title_in_oi_file_manager" translatable="false">Solid Explorer</string>
     <string name="app_name">DiskUsage</string>
-<string name="app_description">Utility to examine SD card content and cleanup some space there.</string>
-<string name="scaning_directories">Scanning directories...</string>
-<string name="button_show">Show</string>
-<string name="button_delete">Delete</string>
-<string name="button_rescan">Rescan</string>
-<string name="button_cancel">Cancel</string>
-<string name="button_background">Background</string>
-<string name="install_oi_file_manager">Install &quot;Solid Explorer&quot; to view directories</string>
-<string name="title_for_path">%s</string>
-<string name="title_in_oi_file_manager">Solid Explorer</string>
-<string name="button_text_in_oi_file_manager">Return to DiskUsage</string>
-<string name="no_viewer_found">No viewer found</string>
-<string name="ask_to_delete_directory">Delete %s directory?</string>
-<string name="ask_to_delete_file">Delete %s file?</string>
-<string name="out_of_memory">Not enough memory!</string>
-<string name="empty_or_missing_sdcard">Empty or missing SD card</string>
-<string name="path_doesnt_exist">%s\ndoesn\'t exist</string>
-<string name="file_deleted">File deleted</string>
-<string name="error_file_wasnt_deleted">Error: file wasn\'t deleted</string>
-<string name="deleting_path">Deleting %s</string>
-<string name="deleted_n_directories_and_n_files">Deleted %1$d directories and %2$d files</string>
-<string name="deleted_n_directories_and_files_and_canceled">Delete canceled: %1$d directories and %2$d files so far</string>
-<string name="deleted_n_directories_and_n_files_and_failed">Delete failed!: %1$d directories and %2$d files was deleted</string>
-<string name="n_bytes">%d bytes</string>
-<string name="n_kilobytes">%d KiB</string>
-<string name="n_megabytes">%5.2f MiB</string>
-<string name="n_megabytes10">%5.1f MiB</string>
-<string name="n_megabytes100">%d MiB</string>
-<string name="n_gigabytes">%5.2f GiB</string>
-<string name="n_gigabytes10">%5.1f GiB</string>
-<string name="n_gigabytes100">%d GiB</string>
-<string name="dir_name_size_num_dirs">%1$s (%2$s, %3$d dirs)</string>
-<string name="dir_empty">%s (empty)</string>
-<string name="dir_name_size">%1$s (%2$s)</string>
-<string name="apps_bulk_uninstall_not_supported">Uninstall multiple apps not supported</string>
-<string name="app_storage">App Storage</string>
-<string name="storage_card">Storage card</string>
-<string name="delete_summary">%1$d files, total size: %2$s</string>
-<string name="change_filter">Filter...</string>
-<string name="apps_filter">Apps Filter</string>
-<string name="internal_only">Internal Only</string>
-<string name="internal_only_desc">Exclude data stored on SD Card</string>
-<string name="show_apk">Show Apk</string>
-<string name="show_apk_desc">Display application files.</string>
-<string name="show_data">Show Data</string>
-<string name="show_data_desc">Display storage allocated for application data.</string>
-<string name="show_dalvikcache">Show DalvikCache</string>
-<string name="show_dalvikcache_desc">Display dalvikCache allocated for your apps on your data partition.</string>
-<string name="show_cache">Show Cache</string>
-<string name="show_cache_desc">Application cache uses different partition and can\'t be used by apk and data.</string>
-<string name="select_apps">Select apps</string>
-<string name="select_storage">Select storage</string>
-<string name="button_search">Search</string>
-<string name="graph_free_space">Free space</string>
-<string name="graph_system_data">System data</string>
-<string name="ask_view">View</string>
-<string name="dialog_usage_access_title">Usage Access Permission Needed</string>
-<string name="dialog_usage_access_desc">Allow DiskUsage to get list of installed apps?</string>
-<string name="dialog_external_storage_access_error">Access to external storage has been denied.</string>
-    <string name="dialog_ask_filemanager_title">Missing compatible file manager</string>
-    <string name="dialog_ask_filemanager_desc">No compatible filemanager found.\n\nAsk you favorite file manager developer for integration with DiskUsage or install:\n * Solid Explorer\n * OI File Manager</string>
-    <string name="button_install_filemanager">Install Solid Explorer</string>
+    <string name="app_description">Utility to examine SD card content and cleanup some space there.</string>
+    <string name="scaning_directories">Scanning directories...</string>
+    <string name="button_show">Show</string>
+    <string name="button_delete">Delete</string>
+    <string name="button_rescan">Rescan</string>
+    <string name="button_background">Background</string>
+    <string name="button_text_in_oi_file_manager">Return to DiskUsage</string>
+    <string name="no_viewer_found">No viewer found</string>
+    <string name="ask_to_delete_directory">Delete %s directory?</string>
+    <string name="ask_to_delete_file">Delete %s file?</string>
+    <string name="out_of_memory">Not enough memory!</string>
+    <string name="empty_or_missing_sdcard">Empty or missing SD card</string>
+    <string name="path_doesnt_exist">%s\ndoesn\'t exist</string>
+    <string name="file_deleted">File deleted</string>
+    <string name="error_file_wasnt_deleted">Error: file wasn\'t deleted</string>
+    <string name="deleting_path">Deleting %s</string>
+    <string name="deleted_n_directories_and_n_files">Deleted %1$d directories and %2$d files</string>
+    <string name="deleted_n_directories_and_files_and_canceled">Delete canceled: %1$d directories and %2$d files so far</string>
+    <string name="deleted_n_directories_and_n_files_and_failed">Delete failed!: %1$d directories and %2$d files was deleted</string>
+    <string name="n_bytes">%d bytes</string>
+    <string name="n_kilobytes">%d KiB</string>
+    <string name="n_megabytes">%5.2f MiB</string>
+    <string name="n_megabytes10">%5.1f MiB</string>
+    <string name="n_megabytes100">%d MiB</string>
+    <string name="n_gigabytes">%5.2f GiB</string>
+    <string name="n_gigabytes10">%5.1f GiB</string>
+    <string name="n_gigabytes100">%d GiB</string>
+    <string name="dir_name_size_num_dirs">%1$s (%2$s, %3$d dirs)</string>
+    <string name="dir_empty">%s (empty)</string>
+    <string name="dir_name_size">%1$s (%2$s)</string>
+    <string name="storage_card">Storage card</string>
+    <string name="delete_summary">%1$d files, total size: %2$s</string>
+    <string name="button_search">Search</string>
+    <string name="graph_free_space">Free space</string>
+    <string name="graph_system_data">System data</string>
     <string name="graph_media">Media</string>
     <string name="graph_apps">Apps</string>
+    <string name="ask_view">View</string>
+    <string name="dialog_usage_access_title">Usage Access Permission Needed</string>
+    <string name="dialog_usage_access_desc">Allow DiskUsage to get list of installed apps?</string>
+    <string name="dialog_external_storage_access_error">Access to external storage has been denied.</string>
     <string name="warn_on_file_select">Press menu to preview or delete</string>
-    <string-array name="select_apps">
-  <item>On device.</item>
-  <item>On SD card.</item>
-  <item>Both.</item>
-</string-array>
-<string-array name="select_storage">
-  <item>Show device memory.</item>
-  <item>Show SD card memory.</item>
-  <item>Show both.</item>
-</string-array>
     <string name="about_view_source_code"><![CDATA[View source code at %s]]></string>
     <string name="action_about">About</string>
-    <string name="rederer">Renderer</string>
-    <string name="software_renderer">Software Renderer</string>
-    <string name="hardware_renderer">Hardware Renderer</string>
+    <string name="small_files">&lt;%d files&gt;</string>
+    <string name="small_dirs">&lt;%d dirs&gt;</string>
+    <string name="small_dirs_and_files">&lt;%1$d dirs and %2$d files&gt;</string>
+    <string name="usage_info">Used %1$s of %2$s</string>
+    <string name="usage_info_unknown">Used &lt;no information&gt;</string>
+    <string name="show_hide_mount_points">[Show/hide]</string>
+    <string name="root_required">[Root required]</string>
+    <string name="setup_visible_mount_points">Setup visible mount points</string>
+    <string name="directory_to_delete_not_found">Oops. Can\'t find directory to be deleted.</string>
+    <string name="delete_directory_instead">Delete directory instead</string>
+    <string name="filesystem_damaged">Filesystem is damaged.</string>
+    <string name="delete_whole_storage_canceled">This delete operation will erase entire storage - canceled.</string>
+    <string name="cyclic_dirs_warning">Cyclic dirs? Broken filesystem?</string>
 </resources>

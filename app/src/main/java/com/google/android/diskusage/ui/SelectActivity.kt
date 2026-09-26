@@ -92,9 +92,9 @@ class SelectActivity : ComponentActivity() {
                     if (mountPoint.root in ignores) continue
                     options += mountPoint.root to { view(mountPoint) }
                 }
-                options += "[Show/hide]" to ::showHideMountPoints
+                options += getString(R.string.show_hide_mount_points) to ::showHideMountPoints
             } else {
-                options += "[Root required]" to {
+                options += getString(R.string.root_required) to {
                     expandRootMountPoints = true
                     makeDialog()
                 }

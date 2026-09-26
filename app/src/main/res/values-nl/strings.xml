@@ -24,11 +24,7 @@
     <string name="button_show">Toon</string>
     <string name="button_delete">Verwijder</string>
     <string name="button_rescan">Herscan</string>
-    <string name="button_cancel">Annuleer</string>
     <string name="button_background">Achtergrond</string>
-    <string name="install_oi_file_manager">Installeer &quot;Solid Explorer&quot; om mappen te bekijken</string>
-    <string name="title_for_path">%s</string>
-    <string name="title_in_oi_file_manager">Solid Explorer</string>
     <string name="button_text_in_oi_file_manager">Terug naar DiskUsage</string>
     <string name="no_viewer_found">Geen viewer gevonden</string>
     <string name="ask_to_delete_directory">Map %s verwijderen?</string>
@@ -47,35 +43,37 @@
     <string name="n_megabytes">%5.2f MB</string>
     <string name="n_megabytes10">%5.1f MB</string>
     <string name="n_megabytes100">%d MB</string>
+    <string name="n_gigabytes">%5.2f GB</string>
+    <string name="n_gigabytes10">%5.1f GB</string>
+    <string name="n_gigabytes100">%d GB</string>
     <string name="dir_name_size_num_dirs">%1$s (%2$s, %3$d mappen)</string>
     <string name="dir_empty">%s (leeg)</string>
     <string name="dir_name_size">%1$s (%2$s)</string>
-    <string name="apps_bulk_uninstall_not_supported">Meerdere applicaties verwijderen is niet ondersteund</string>
-    <string name="app_storage">Appgeheugen</string>
     <string name="storage_card">Geheugenkaart</string>
     <string name="delete_summary">%1$d bestanden, totale grootte: %2$s</string>
-    <string name="change_filter">Filter...</string>
-    <string name="apps_filter">Appsfilter</string>
-    <string name="internal_only">Alleen inwendig</string>
-    <string name="internal_only_desc">Toon geen data van SD-kaart</string>
-    <string name="show_apk">Toon apk</string>
-    <string name="show_apk_desc">Toon applicatiebestanden.</string>
-    <string name="show_data">Toon data</string>
-    <string name="show_data_desc">Toon geheugen gebruikt voor data.</string>
-    <string name="show_dalvikcache">Toon DalvikCache</string>
-    <string name="show_dalvikcache_desc">Toon geheugen gebruikt voor dalvikCache op de datapartitie.</string>
-    <string name="show_cache">Toon cache</string>
-    <string name="show_cache_desc">Applicatiecache gebruikt een andere partitie en kan niet worden gebruikt voor apk of data.</string>
-    <string name="select_apps">Kies applicaties</string>
-    <string name="select_storage">Kies opslag</string>
-    <string-array name="select_apps">
-        <item>Op apparaat.</item>
-        <item>Op SD-kaart.</item>
-        <item>Beide.</item>
-    </string-array>
-    <string-array name="select_storage">
-        <item>Toon geheugen apparaat.</item>
-        <item>Toon geheugen SD-kaart.</item>
-        <item>Toon beide.</item>
-</string-array>
+    <string name="button_search">Zoeken</string>
+    <string name="graph_free_space">Vrije ruimte</string>
+    <string name="graph_system_data">Systeemgegevens</string>
+    <string name="graph_media">Media</string>
+    <string name="graph_apps">Apps</string>
+    <string name="ask_view">Bekijken</string>
+    <string name="dialog_usage_access_title">Toestemming voor gebruikstoegang vereist</string>
+    <string name="dialog_usage_access_desc">DiskUsage toestaan de lijst met geïnstalleerde apps op te halen?</string>
+    <string name="dialog_external_storage_access_error">Toegang tot externe opslag is geweigerd.</string>
+    <string name="warn_on_file_select">Druk op menu om te bekijken of te verwijderen</string>
+    <string name="about_view_source_code"><![CDATA[Bekijk de broncode op %s]]></string>
+    <string name="action_about">Over</string>
+    <string name="small_files">&lt;%d bestanden&gt;</string>
+    <string name="small_dirs">&lt;%d mappen&gt;</string>
+    <string name="small_dirs_and_files">&lt;%1$d mappen en %2$d bestanden&gt;</string>
+    <string name="usage_info">%1$s van %2$s gebruikt</string>
+    <string name="usage_info_unknown">Gebruikt: &lt;geen informatie&gt;</string>
+    <string name="show_hide_mount_points">[Tonen/verbergen]</string>
+    <string name="root_required">[Root vereist]</string>
+    <string name="setup_visible_mount_points">Zichtbare koppelpunten instellen</string>
+    <string name="directory_to_delete_not_found">Oeps. De te verwijderen map is niet gevonden.</string>
+    <string name="delete_directory_instead">Verwijder in plaats daarvan de map</string>
+    <string name="filesystem_damaged">Het bestandssysteem is beschadigd.</string>
+    <string name="delete_whole_storage_canceled">Deze verwijdering zou de hele opslag wissen - geannuleerd.</string>
+    <string name="cyclic_dirs_warning">Cyclische mappen? Beschadigd bestandssysteem?</string>
 </resources>

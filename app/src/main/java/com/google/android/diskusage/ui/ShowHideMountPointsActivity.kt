@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.preference.CheckBoxPreference
 import androidx.preference.PreferenceFragmentCompat
+import com.google.android.diskusage.R
 import com.google.android.diskusage.filesystem.FileSystemStats
 import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import com.google.android.diskusage.filesystem.mnt.RootMountPoint
@@ -30,7 +31,7 @@ class ShowHideMountPointsActivity : AppCompatActivity() {
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
-                title = "Setup visible mount points"
+                title = getString(R.string.setup_visible_mount_points)
                 isOrderingAsAdded = true
             }
         }
@@ -45,7 +46,7 @@ class ShowHideMountPointsActivity : AppCompatActivity() {
                 preferenceScreen.addPreference(CheckBoxPreference(context).apply {
                     isPersistent = false
                     title = mountPoint.root
-                    summary = FileSystemStats(mountPoint).formatUsageInfo()
+                    summary = FileSystemStats(mountPoint).formatUsageInfo(context)
                     isChecked = mountPoint.root !in ignores
                 })
             }

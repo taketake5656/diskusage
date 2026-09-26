@@ -41,6 +41,7 @@ import com.google.android.diskusage.R
 import com.google.android.diskusage.core.NativeScanner
 import com.google.android.diskusage.core.ProgressGenerator
 import com.google.android.diskusage.core.Scanner
+import com.google.android.diskusage.core.SmallEntryName
 import com.google.android.diskusage.databinding.ActivityCommonBinding
 import com.google.android.diskusage.datasource.fast.LegacyFileImpl
 import com.google.android.diskusage.filesystem.Apps2SDLoader
@@ -170,7 +171,7 @@ class DiskUsage : LoadableActivity() {
         if (entry != null) {
             BackgroundDelete.startDelete(this, entry)
         } else {
-            toast("Oops. Can't find directory to be deleted.")
+            toast(R.string.directory_to_delete_not_found)
         }
     }
 
@@ -180,7 +181,7 @@ class DiskUsage : LoadableActivity() {
         Timber.d("Deletion requested for %s", path)
 
         if (entry is FileSystemEntrySmall) {
-            toast("Delete directory instead")
+            toast(R.string.delete_directory_instead)
             return
         }
         if (entry.children.isNullOrEmpty()) {
@@ -357,18 +358,26 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    private val smallEntryName = SmallEntryName { numDirs, numFiles ->
+        when {
+            numDirs == 0 -> getString(R.string.small_files, numFiles)
+            numFiles == 0 -> getString(R.string.small_dirs, numDirs)
+            else -> getString(R.string.small_dirs_and_files, numDirs, numFiles)
+        }
+    }
+
     override fun scan(): FileSystemSuperRoot {
         val mountPoint = MountPoint.getForKey(this, key)!!
         val stats = FileSystemStats(mountPoint)
         val heap = memoryQuota
 
         val rootElement = try {
-            val scanner = NativeScanner(stats.blockSize, stats.busyBlocks, heap)
+            val scanner = NativeScanner(stats.blockSize, stats.busyBlocks, heap, smallEntryName)
             withProgress(scanner, stats) { scanner.scan(mountPoint) }
         } catch (e: Exception) {
             if (e !is RuntimeException && e !is IOException) throw e
             Timber.w(e, "Native scanner failed, falling back to Java scanner")
-            val scanner = Scanner(20, stats.blockSize, stats.busyBlocks, heap)
+            val scanner = Scanner(20, stats.blockSize, stats.busyBlocks, heap, smallEntryName)
             withProgress(scanner, stats) {
                 scanner.scan(LegacyFileImpl.createRoot(mountPoint.root))
             }

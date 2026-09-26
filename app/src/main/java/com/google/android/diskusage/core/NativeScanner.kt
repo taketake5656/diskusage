@@ -34,8 +34,12 @@ import java.io.InputStream
  *
  * Sizes in blocks are in 512 bytes units.
  */
-class NativeScanner(blockSize: Long, allocatedBlocks: Long, maxHeap: Int) :
-    TreeScanner(blockSize, allocatedBlocks, maxHeap) {
+class NativeScanner(
+    blockSize: Long,
+    allocatedBlocks: Long,
+    maxHeap: Int,
+    smallEntryName: SmallEntryName = SmallEntryName.DEFAULT,
+) : TreeScanner(blockSize, allocatedBlocks, maxHeap, smallEntryName) {
 
     private lateinit var input: InputStream
     private val buffer = ByteArray(BUFFER_SIZE)
