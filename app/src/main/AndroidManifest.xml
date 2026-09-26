@@ -28,7 +28,6 @@
                  android:allowTaskReparenting="true"
                  android:launchMode="singleTop"
                  android:theme="@style/Theme"
-                 android:hardwareAccelerated="true"
                  android:requestLegacyExternalStorage="true">
         <activity android:name=".ui.SelectActivity"
             android:exported="true">
@@ -39,7 +38,6 @@
         </activity>
     <activity android:name=".ui.DiskUsage"
         android:theme="@style/Theme.NoBackground"
-              android:hardwareAccelerated="false"
               android:windowSoftInputMode="adjustResize" android:exported="true">
     </activity>
     <activity android:name=".ui.PermissionRequestActivity"/>

@@ -2,8 +2,6 @@ package com.google.android.diskusage.ui
 
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.google.android.diskusage.R
-import com.google.android.diskusage.utils.AppHelper
 
 class DiskUsageViewModel : ViewModel() {
     val toolbarActionButtonVisible = MutableLiveData(false)
@@ -13,8 +11,6 @@ class DiskUsageViewModel : ViewModel() {
     val rescanButton = MutableLiveData(false)
 
     val deleteButton = MutableLiveData(false)
-
-    val rendererButtonTitle = MutableLiveData(AppHelper.appContext.getString(R.string.rederer))
 
     fun showToolbarActionButton() {
         toolbarActionButtonVisible.value = true
@@ -46,9 +42,5 @@ class DiskUsageViewModel : ViewModel() {
 
     fun disableDeleteButton() {
         deleteButton.value = false
-    }
-
-    fun setRendererButtonTitle(title: String) {
-        rendererButtonTitle.value = title
     }
 }

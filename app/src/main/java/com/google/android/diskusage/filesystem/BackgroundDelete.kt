@@ -83,11 +83,9 @@ class BackgroundDelete private constructor(
         } catch (e: Exception) {
             // ignore exception
         }
-        fileSystemState.removeInRenderThread(entry)
+        fileSystemState.removeEntry(entry)
         if (status != Status.SUCCESS) {
             restore()
-            fileSystemState.requestRepaint()
-            fileSystemState.requestRepaintGPU()
         }
         notifyUser(status)
     }
@@ -149,13 +147,13 @@ class BackgroundDelete private constructor(
             }
             if (!file.exists()) {
                 longToast(appStr(R.string.path_doesnt_exist, path))
-                state.removeInRenderThread(entry)
+                state.removeEntry(entry)
                 return
             }
             if (file.isFile) {
                 if (file.delete()) {
                     toast(R.string.file_deleted)
-                    state.removeInRenderThread(entry)
+                    state.removeEntry(entry)
                 } else {
                     toast(R.string.error_file_wasnt_deleted)
                 }

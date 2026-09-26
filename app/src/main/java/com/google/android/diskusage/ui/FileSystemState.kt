@@ -31,61 +31,21 @@ import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import com.google.android.diskusage.filesystem.entity.FileSystemFreeSpace
 import com.google.android.diskusage.filesystem.entity.FileSystemSuperRoot
 import com.google.android.diskusage.filesystem.entity.FileSystemSystemSpace
-import com.google.android.diskusage.opengl.FileSystemViewGPU
-import com.google.android.diskusage.opengl.RenderingThread
 import kotlin.math.abs
 import splitties.toast.toast
 import timber.log.Timber
 
 /**
  * State of the file system view: cursor, zoom, animations and touch handling.
- * Shared by the Canvas and the OpenGL views.
  */
 class FileSystemState(
     private val context: DiskUsage,
     root: FileSystemSuperRoot,
 ) {
-    interface FileSystemView {
-        /** Does nothing in GPU View. */
-        fun requestRepaint()
-
-        /** Does nothing in GPU View. */
-        fun requestRepaint(l: Int, t: Int, r: Int, b: Int)
-
-        /** Sends event to wake up rendering thread. */
-        fun requestRepaintGPU()
-
-        /** Run action in renderer thread. */
-        fun runInRenderThread(r: Runnable)
-        fun killRenderThread()
-    }
-
-    /**
-     * Actions to run on the main thread. With the GPU view the state is
-     * accessed from the rendering thread, so the actions are posted.
-     */
-    internal class MainThreadAction(private val context: DiskUsage, private val post: Boolean) {
-        private fun perform(action: DiskUsage.() -> Unit) {
-            if (post) {
-                context.handler.post { context.action() }
-            } else {
-                context.action()
-            }
-        }
-
-        fun updateTitle(position: FileSystemEntry) = perform { setSelectedEntity(position) }
-        fun warnOnFileSelect() = perform { toast(R.string.warn_on_file_select) }
-        fun view(entry: FileSystemEntry) = perform { view(entry) }
-        fun finishOnBack() = perform { finishOnBack() }
-        fun searchRequest() = perform { searchRequest() }
-    }
-
     private lateinit var view: FileSystemView
     var masterRoot: FileSystemSuperRoot = root
         private set
     private lateinit var cursor: Cursor
-    internal var mainThreadAction = MainThreadAction(context, post = false)
-        private set
 
     private var numSpecialEntries = 0
     private var freeSpace: FileSystemFreeSpace? = null
@@ -354,16 +314,7 @@ class FileSystemState(
         fun getY(i: Int) = yy[i]
     }
 
-    fun onTouchEvent(ev: MyMotionEvent): Boolean {
-        try {
-            handleTouchEvent(ev)
-        } finally {
-            requestRepaintGPU()
-        }
-        return true
-    }
-
-    private fun handleTouchEvent(ev: MyMotionEvent) {
+    fun onTouchEvent(ev: MyMotionEvent) {
         if (sdcardIsEmpty()) return
 
         if (deletingEntry != null) {
@@ -471,62 +422,61 @@ class FileSystemState(
         updateSpecialEntries()
         cursor = Cursor(this, masterRoot)
         requestRepaint()
-        requestRepaintGPU()
     }
 
     fun replaceRootKeepCursor(newRoot: FileSystemSuperRoot) {
-        view.runInRenderThread {
-            var oldPosition = cursor.position
-            val newPosition = newRoot.getEntryByName(oldPosition.path2(), false)
-                ?: newRoot.children!![0]
-            val newDepth = newRoot.depth(newPosition)
-            var oldDepth = masterRoot.depth(cursor.position)
-            while (oldDepth > newDepth) {
-                oldPosition = oldPosition.parent!!
-                oldDepth--
-            }
-            val oldTop = masterRoot.getOffset(oldPosition)
-            val oldSize = oldPosition.sizeForRendering
-            val oldBottom = oldTop + oldSize
-            val newTop = newRoot.getOffset(newPosition)
-            val newSize = newPosition.sizeForRendering
-            val newBottom = newTop + newSize
-            val above = (oldTop - targetViewTop) / oldSize.toDouble()
-            val below = (targetViewBottom - oldBottom) / oldSize.toDouble()
-            prepareMotion(SystemClock.uptimeMillis())
-            viewTop = newTop - (above * newSize).toLong()
-            viewBottom = (below * newSize).toLong() + newBottom
-            targetViewTop = viewTop.coerceAtMost(newTop)
-            targetViewBottom = viewBottom.coerceAtLeast(newBottom)
-            animationDuration = 300
-            rescanFinished(newRoot)
-            cursor.set(this, newPosition)
+        var oldPosition = cursor.position
+        val newPosition = newRoot.getEntryByName(oldPosition.path2(), false)
+            ?: newRoot.children!![0]
+        val newDepth = newRoot.depth(newPosition)
+        var oldDepth = masterRoot.depth(cursor.position)
+        while (oldDepth > newDepth) {
+            oldPosition = oldPosition.parent!!
+            oldDepth--
         }
+        val oldTop = masterRoot.getOffset(oldPosition)
+        val oldSize = oldPosition.sizeForRendering
+        val oldBottom = oldTop + oldSize
+        val newTop = newRoot.getOffset(newPosition)
+        val newSize = newPosition.sizeForRendering
+        val newBottom = newTop + newSize
+        val above = (oldTop - targetViewTop) / oldSize.toDouble()
+        val below = (targetViewBottom - oldBottom) / oldSize.toDouble()
+        prepareMotion(SystemClock.uptimeMillis())
+        viewTop = newTop - (above * newSize).toLong()
+        viewBottom = (below * newSize).toLong() + newBottom
+        targetViewTop = viewTop.coerceAtMost(newTop)
+        targetViewBottom = viewBottom.coerceAtLeast(newBottom)
+        animationDuration = 300
+        rescanFinished(newRoot)
+        cursor.set(this, newPosition)
     }
 
-    fun startZoomAnimationInRenderThread(newRoot: FileSystemSuperRoot?, animate: Boolean) {
-        view.runInRenderThread {
-            if (newRoot != null) rescanFinished(newRoot)
-            if (animate) {
-                val large = masterRoot.sizeForRendering * 10
-                val center = masterRoot.sizeForRendering / 2
-                viewTop = center - large
-                viewBottom = center + large
-                viewDepth = 0f
-                prepareMotion(SystemClock.uptimeMillis())
-                animationDuration = 300
-                targetViewTop = 0
-                targetViewBottom = masterRoot.sizeForRendering
-                targetViewDepth = 0f
-                zoomState = ZoomState.ZOOM_ALLOCATED
-                setZoomState()
-            }
+    fun startZoomAnimation(newRoot: FileSystemSuperRoot?, animate: Boolean) {
+        if (newRoot != null) rescanFinished(newRoot)
+        if (animate) {
+            val large = masterRoot.sizeForRendering * 10
+            val center = masterRoot.sizeForRendering / 2
+            viewTop = center - large
+            viewBottom = center + large
+            viewDepth = 0f
+            prepareMotion(SystemClock.uptimeMillis())
+            animationDuration = 300
+            targetViewTop = 0
+            targetViewBottom = masterRoot.sizeForRendering
+            targetViewDepth = 0f
+            zoomState = ZoomState.ZOOM_ALLOCATED
+            setZoomState()
         }
+        requestRepaint()
     }
 
     fun setView(view: FileSystemView) {
         this.view = view
-        mainThreadAction = MainThreadAction(context, post = view is FileSystemViewGPU)
+    }
+
+    internal fun onCursorMoved(position: FileSystemEntry) {
+        context.setSelectedEntity(position)
     }
 
     private fun updateSpecialEntries() {
@@ -610,37 +560,23 @@ class FileSystemState(
         return true
     }
 
-    fun onDrawGPU(rt: RenderingThread): Boolean {
-        try {
-            val animation = preDraw()
-            val bounds = Rect(0, 0, screenWidth, screenHeight)
-            masterRoot.paintGPU(rt, bounds, cursor, displayTop, viewDepth, yscale,
-                screenHeight, numSpecialEntries)
-            return postDraw(animation)
-        } catch (t: Throwable) {
-            Timber.d(t, "onDrawGPU: Got exception")
-        }
-        return false
-    }
+    private val drawBounds = Rect()
 
-    fun onDraw2(canvas: Canvas) {
+    fun onDraw(canvas: Canvas, skin: TreeSkin) {
         try {
             val animation = preDraw()
-            val clipBounds = canvas.clipBounds
-            val bounds = if (clipBounds.left == 0 && clipBounds.top == 0 &&
-                clipBounds.right == 0 && clipBounds.bottom == 0
-            ) {
-                Rect(0, 0, screenWidth, screenHeight)
-            } else {
-                clipBounds
+            val bounds = drawBounds
+            canvas.getClipBounds(bounds)
+            if (bounds.left == 0 && bounds.top == 0 && bounds.right == 0 && bounds.bottom == 0) {
+                bounds.set(0, 0, screenWidth, screenHeight)
             }
-            masterRoot.paint(canvas, bounds, cursor, displayTop, viewDepth, yscale,
+            masterRoot.paint(canvas, skin, bounds, cursor, displayTop, viewDepth, yscale,
                 screenHeight, numSpecialEntries)
             if (postDraw(animation)) {
                 requestRepaint()
             }
         } catch (t: Throwable) {
-            Timber.d(t, "onDraw2: Got exception")
+            Timber.d(t, "onDraw: Got exception")
         }
     }
 
@@ -651,14 +587,6 @@ class FileSystemState(
         prevViewBottom = viewBottom
         prevElementWidth = FileSystemEntry.elementWidth
         animationStartTime = time
-    }
-
-    internal fun invalidate(cursor: Cursor) {
-        val cursorX0 = (cursor.depth - viewDepth) * FileSystemEntry.elementWidth
-        val cursorY0 = (cursor.top - displayTop) * yscale
-        val cursorX1 = cursorX0 + FileSystemEntry.elementWidth
-        val cursorY1 = cursorY0 + cursor.position.sizeForRendering * yscale
-        requestRepaint(cursorX0.toInt(), cursorY0.toInt(), cursorX1.toInt() + 2, cursorY1.toInt() + 2)
     }
 
     private fun touchSelect(entry: FileSystemEntry, eventTime: Long) {
@@ -683,7 +611,7 @@ class FileSystemState(
             if (targetViewTop == prevViewTop && targetViewBottom == prevViewBottom &&
                 !warnOnFileSelect && entry !is FileSystemSystemSpace
             ) {
-                mainThreadAction.warnOnFileSelect()
+                toast(R.string.warn_on_file_select)
                 warnOnFileSelect = true
             }
             val minRequiredDepth = cursor.depth + 1 - maxLevels
@@ -822,9 +750,6 @@ class FileSystemState(
         return true
     }
 
-    val isGPU: Boolean
-        get() = view is FileSystemViewGPU
-
     private fun moveAwayCursor(entry: FileSystemEntry) {
         if (cursor.position !== entry) return
         cursor.up(this)
@@ -832,9 +757,9 @@ class FileSystemState(
         cursor.left(this)
     }
 
-    fun removeInRenderThread(entry: FileSystemEntry) {
-        view.runInRenderThread { fadeAwayEntryStart(entry) }
-        requestRepaintGPU()
+    /** Removes the entry with an animation. */
+    fun removeEntry(entry: FileSystemEntry) {
+        fadeAwayEntryStart(entry)
         requestRepaint()
     }
 
@@ -852,7 +777,7 @@ class FileSystemState(
             freeSpace.setSizeInBlocks(freeSpace.sizeInBlocks + deletingEntryBlocks, displayBlockSize)
             masterRoot.setSizeInBlocks(masterRoot.sizeInBlocks + deletingEntryBlocks, displayBlockSize)
             root.setSizeInBlocks(root.sizeInBlocks + deletingEntryBlocks, displayBlockSize)
-            freeSpace.clearDrawingCache()
+            freeSpace.clearSizeStringCache()
         }
 
         FileSystemEntry.deletedEntry = null
@@ -885,22 +810,8 @@ class FileSystemState(
         deletingInitialSize = entry.sizeInBlocks
     }
 
-    // Should be called from main thread
     fun requestRepaint() {
-        // Does nothing in GPU View
-        view.requestRepaint()
-    }
-
-    // Should be called from main thread
-    private fun requestRepaint(l: Int, t: Int, r: Int, b: Int) {
-        // Does nothing in GPU View
-        view.requestRepaint(l, t, r, b)
-    }
-
-    // Should be called from main thread
-    fun requestRepaintGPU() {
-        // Only for GPU View
-        view.requestRepaintGPU()
+        view.invalidate()
     }
 
     private fun fadeAwayEntry() {
@@ -964,33 +875,25 @@ class FileSystemState(
         }
     }
 
+    /** Finishes the deletion animation, e.g. when the deletion has failed. */
     fun restore() {
-        view.runInRenderThread {
-            if (deletingEntry != null) {
-                deleteDeletingEntry()
-            }
+        if (deletingEntry != null) {
+            deleteDeletingEntry()
         }
+        requestRepaint()
     }
 
     fun sdcardIsEmpty(): Boolean = cursor.position === masterRoot
 
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (sdcardIsEmpty()) return false
-        try {
-            return handleKeyDown(keyCode, event)
-        } finally {
-            requestRepaintGPU()
-        }
-    }
-
-    private fun handleKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
             KeyEvent.KEYCODE_SEARCH -> {
-                mainThreadAction.searchRequest()
+                context.searchRequest()
                 return true
             }
             KeyEvent.KEYCODE_BACK -> {
-                mainThreadAction.finishOnBack()
+                context.finishOnBack()
                 return true
             }
         }
@@ -1032,7 +935,7 @@ class FileSystemState(
                 val selected = cursor.position
                 // FIXME: hack to disable removal of /sdcard
                 if (selected !== masterRoot.children!![0]) {
-                    mainThreadAction.view(selected)
+                    context.view(selected)
                 }
                 return true
             }
@@ -1056,27 +959,26 @@ class FileSystemState(
         setZoomState()
     }
 
-    fun restoreStateInRenderThread(inState: Bundle) {
-        view.runInRenderThread {
-            val cursorName = inState.getString("cursor") ?: return@runInRenderThread
-            val entry = masterRoot.getEntryByName(cursorName, true) ?: return@runInRenderThread
-            cursor.set(this, entry)
-            viewDepth = inState.getFloat("viewDepth")
-            prevViewDepth = viewDepth
-            targetViewDepth = viewDepth
-            viewTop = inState.getLong("viewTop")
-            prevViewTop = viewTop
-            targetViewTop = viewTop
-            viewBottom = inState.getLong("viewBottom")
-            prevViewBottom = viewBottom
-            targetViewBottom = viewBottom
-            zoomState = when (inState.getInt("zoomState")) {
-                0 -> ZoomState.ZOOM_ALLOCATED
-                1 -> ZoomState.ZOOM_FULL
-                else -> ZoomState.ZOOM_OTHER
-            }
-            maxLevels = inState.getFloat("maxLevels")
+    fun restoreState(inState: Bundle) {
+        val cursorName = inState.getString("cursor") ?: return
+        val entry = masterRoot.getEntryByName(cursorName, true) ?: return
+        cursor.set(this, entry)
+        viewDepth = inState.getFloat("viewDepth")
+        prevViewDepth = viewDepth
+        targetViewDepth = viewDepth
+        viewTop = inState.getLong("viewTop")
+        prevViewTop = viewTop
+        targetViewTop = viewTop
+        viewBottom = inState.getLong("viewBottom")
+        prevViewBottom = viewBottom
+        targetViewBottom = viewBottom
+        zoomState = when (inState.getInt("zoomState")) {
+            0 -> ZoomState.ZOOM_ALLOCATED
+            1 -> ZoomState.ZOOM_FULL
+            else -> ZoomState.ZOOM_OTHER
         }
+        maxLevels = inState.getFloat("maxLevels")
+        requestRepaint()
     }
 
     fun saveState(outState: Bundle) {
@@ -1132,20 +1034,6 @@ class FileSystemState(
             ZoomState.ZOOM_ALLOCATED
         }
         setZoomState()
-    }
-
-    fun killRenderThread() {
-        view.killRenderThread()
-    }
-
-    fun draw300ms() {
-        val curr = SystemClock.uptimeMillis()
-        if (curr > animationStartTime + animationDuration) {
-            viewTop = targetViewTop
-            viewBottom = targetViewBottom
-            prepareMotion(SystemClock.uptimeMillis())
-            animationDuration = 300
-        }
     }
 
     private companion object {

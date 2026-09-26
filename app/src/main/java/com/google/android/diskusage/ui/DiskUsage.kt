@@ -54,7 +54,6 @@ import com.google.android.diskusage.filesystem.entity.FileSystemRoot
 import com.google.android.diskusage.filesystem.entity.FileSystemSuperRoot
 import com.google.android.diskusage.filesystem.entity.FileSystemSystemSpace
 import com.google.android.diskusage.filesystem.mnt.MountPoint
-import com.google.android.diskusage.opengl.RendererManager
 import com.google.android.diskusage.utils.applySystemBarsPadding
 import java.io.File
 import java.io.IOException
@@ -73,7 +72,6 @@ class DiskUsage : LoadableActivity() {
     private var pathToDelete: String? = null
 
     val menu = DiskUsageMenu(this)
-    val rendererManager = RendererManager(this)
     private val viewModel: DiskUsageViewModel by viewModels()
     private val afterLoadActions = mutableListOf<Runnable>()
 
@@ -115,19 +113,20 @@ class DiskUsage : LoadableActivity() {
 
     override fun onResume() {
         super.onResume()
-        rendererManager.onResume()
         pkgRemoved?.let { pkg ->
             // Check if package removed
             if (!isPackageInstalled(pkg.pkg)) {
-                fileSystemState?.removeInRenderThread(pkg)
+                fileSystemState?.removeEntry(pkg)
             }
             pkgRemoved = null
         }
         loadFiles({ root, isCached ->
             val state = FileSystemState(this, root)
             fileSystemState = state
-            rendererManager.makeView(state, root)
-            state.startZoomAnimationInRenderThread(null, !isCached)
+            val view = FileSystemView(this, state)
+            menu.wrapAndSetContentView(view, root)
+            view.requestFocus()
+            state.startZoomAnimation(null, !isCached)
 
             afterLoadActions.forEach { it.run() }
             afterLoadActions.clear()
@@ -146,13 +145,11 @@ class DiskUsage : LoadableActivity() {
     }
 
     override fun onPause() {
-        rendererManager.onPause()
         super.onPause()
         fileSystemState?.let { state ->
-            state.killRenderThread()
             val savedState = Bundle()
             state.saveState(savedState)
-            afterLoadActions += Runnable { fileSystemState?.restoreStateInRenderThread(savedState) }
+            afterLoadActions += Runnable { fileSystemState?.restoreState(savedState) }
         }
     }
 
@@ -277,7 +274,7 @@ class DiskUsage : LoadableActivity() {
 
     fun rescan() {
         loadFiles({ newRoot, isCached ->
-            fileSystemState?.startZoomAnimationInRenderThread(newRoot, !isCached)
+            fileSystemState?.startZoomAnimation(newRoot, !isCached)
         }, true)
     }
 
@@ -306,7 +303,6 @@ class DiskUsage : LoadableActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         val state = fileSystemState ?: return
-        state.killRenderThread()
         state.saveState(outState)
         menu.onSaveInstanceState(outState)
     }
@@ -316,10 +312,10 @@ class DiskUsage : LoadableActivity() {
             savedInstanceState.getString(KEY_KEY))
         val state = fileSystemState
         if (state != null) {
-            state.restoreStateInRenderThread(savedInstanceState)
+            state.restoreState(savedInstanceState)
         } else {
             afterLoadActions += Runnable {
-                fileSystemState?.restoreStateInRenderThread(savedInstanceState)
+                fileSystemState?.restoreState(savedInstanceState)
             }
         }
         menu.onRestoreInstanceState(savedInstanceState)

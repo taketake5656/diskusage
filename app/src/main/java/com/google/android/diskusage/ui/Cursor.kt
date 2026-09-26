@@ -38,14 +38,12 @@ class Cursor internal constructor(state: FileSystemState, private val root: File
     }
 
     private fun updateTitle(state: FileSystemState) {
-        state.mainThreadAction.updateTitle(position)
+        state.onCursorMoved(position)
     }
 
-    /** Moves the cursor with repainting of the old and the new position. */
     private inline fun move(state: FileSystemState, change: () -> Unit) {
-        state.invalidate(this)
         change()
-        state.invalidate(this)
+        state.requestRepaint()
         updateTitle(state)
     }
 

@@ -21,15 +21,11 @@ package com.google.android.diskusage.filesystem.entity
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
-import android.util.TypedValue
-import androidx.core.graphics.toColorInt
 import com.google.android.diskusage.R
-import com.google.android.diskusage.opengl.DrawingCache
-import com.google.android.diskusage.opengl.RenderingThread
 import com.google.android.diskusage.ui.Cursor
+import com.google.android.diskusage.ui.TreeSkin
 import timber.log.Timber
 
 open class FileSystemEntry protected constructor(
@@ -64,7 +60,7 @@ open class FileSystemEntry protected constructor(
 
     var children: Array<FileSystemEntry>? = null
 
-    var drawingCache: DrawingCache? = null
+    private var cachedSizeString: String? = null
 
     val sizeInBlocks: Long
         get() = encodedSize shr BLOCK_OFFSET
@@ -85,8 +81,12 @@ open class FileSystemEntry protected constructor(
 
     fun sizeString(): String = calcSizeStringFromEncoded(encodedSize)
 
-    fun clearDrawingCache() {
-        drawingCache?.resetSizeString()
+    /** Size string, cached for painting. */
+    private fun cachedSizeString(): String =
+        cachedSizeString ?: sizeString().also { cachedSizeString = it }
+
+    fun clearSizeStringCache() {
+        cachedSizeString = null
     }
 
     fun setSizeInBlocks(blocks: Long, blockSize: Long) {
@@ -166,37 +166,15 @@ open class FileSystemEntry protected constructor(
             return siblings.getOrNull(parent!!.getIndexOf(this) - 1) ?: this
         }
 
-    private val drawingCacheOrCreate: DrawingCache
-        get() = drawingCache ?: DrawingCache(this).also { drawingCache = it }
-
-    fun paintGPU(
-        rt: RenderingThread, bounds: Rect, cursor: Cursor, viewTop: Long,
-        viewDepth: Float, yscale: Float, screenHeight: Int, numSpecialEntries: Int,
-    ) {
-        val clip = ViewClip(bounds, viewTop, viewDepth, yscale)
-        val children = children!!
-        paintGPU(sizeForRendering, children, rt, clip.xoffset, clip.yoffset, yscale,
-            clip.left, clip.top, clip.bottom, screenHeight)
-        paintSpecialGPU(children, rt, clip.xoffset, clip.yoffset, yscale,
-            clip.left, clip.top, clip.bottom, screenHeight, numSpecialEntries)
-
-        // paint position
-        val cursorLeft = cursor.depth * elementWidth + clip.xoffset
-        val cursorTop = (cursor.top - viewTop) * yscale
-        val cursorRight = cursorLeft + elementWidth
-        val cursorBottom = cursorTop + cursor.position.sizeForRendering * yscale
-        rt.cursorSquare.drawFrame(cursorLeft, cursorTop, cursorRight, cursorBottom)
-    }
-
     fun paint(
-        canvas: Canvas, bounds: Rect, cursor: Cursor, viewTop: Long,
+        canvas: Canvas, skin: TreeSkin, bounds: Rect, cursor: Cursor, viewTop: Long,
         viewDepth: Float, yscale: Float, screenHeight: Int, numSpecialEntries: Int,
     ) {
         val clip = ViewClip(bounds, viewTop, viewDepth, yscale)
         val children = children!!
-        paint(sizeForRendering, children, canvas, clip.xoffset, clip.yoffset, yscale,
-            clip.left, clip.top, clip.bottom, screenHeight)
-        paintSpecial(children, canvas, clip.xoffset, clip.yoffset, yscale,
+        paint(sizeForRendering, children, canvas, skin, clip.xoffset, clip.yoffset, yscale,
+            clip.left, clip.top, clip.bottom, bounds.right.toFloat(), screenHeight)
+        paintSpecial(children, canvas, skin, clip.xoffset, clip.yoffset, yscale,
             clip.left, clip.top, clip.bottom, screenHeight, numSpecialEntries)
 
         // paint position
@@ -204,7 +182,7 @@ open class FileSystemEntry protected constructor(
         val cursorTop = (cursor.top - viewTop) * yscale
         val cursorRight = cursorLeft + elementWidth
         val cursorBottom = cursorTop + cursor.position.sizeForRendering * yscale
-        canvas.drawRect(cursorLeft, cursorTop, cursorRight, cursorBottom, cursorFg)
+        skin.drawCursor(canvas, cursorLeft, cursorTop, cursorRight, cursorBottom)
     }
 
     /**
@@ -313,7 +291,7 @@ open class FileSystemEntry protected constructor(
         var p: FileSystemEntry? = parent
         while (p != null) {
             p.setSizeInBlocks(p.sizeInBlocks - blocks, blockSize)
-            p.clearDrawingCache()
+            p.clearSizeStringCache()
             p.children!!.sortWith(COMPARE)
             p = p.parent
         }
@@ -328,7 +306,7 @@ open class FileSystemEntry protected constructor(
         var p: FileSystemEntry? = this
         while (p != null) {
             p.setSizeInBlocks(p.sizeInBlocks + blocks, blockSize)
-            p.clearDrawingCache()
+            p.clearSizeStringCache()
             p = p.parent
         }
     }
@@ -348,32 +326,6 @@ open class FileSystemEntry protected constructor(
     }
 
     companion object {
-        private val bg = fillPaint("#060118".toColorInt())
-        private val bgEmptySpace = fillPaint("#063A43".toColorInt())
-        private val cursorFg = Paint().apply {
-            color = Color.YELLOW
-            style = Paint.Style.STROKE
-        }
-        private val fgRect = Paint().apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-        }
-        private val fillBg = fillPaint(Color.WHITE)
-        private val textPaintFolder = textPaint(Color.WHITE)
-        private val textPaintFile = textPaint("#18C5E7".toColorInt())
-
-        private fun fillPaint(color: Int) = Paint().apply {
-            this.color = color
-            style = Paint.Style.FILL
-        }
-
-        private fun textPaint(color: Int) = Paint().apply {
-            this.color = color
-            style = Paint.Style.FILL_AND_STROKE
-            isAntiAlias = true
-        }
-
         var ascent = 0f
             private set
 
@@ -418,8 +370,6 @@ open class FileSystemEntry protected constructor(
         // probably 32 bits for maximum number of block will break before ~2016
         const val BLOCK_OFFSET = 24
         private const val BLOCK_MASK = (1L shl BLOCK_OFFSET) - 1
-
-        const val PADDING = 4
 
         private const val KB = 1024L
         private const val MB = 1024L * KB
@@ -493,17 +443,10 @@ open class FileSystemEntry protected constructor(
             dirNameSize = context.getString(R.string.dir_name_size)
         }
 
-        fun updateFontsLegacy(context: Context) {
-            val textSize = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, 12f, context.resources.displayMetrics) + 0.5f
-            updateFonts(textSize.coerceAtLeast(10f))
-        }
-
-        fun updateFonts(textSize: Float) {
-            textPaintFile.textSize = textSize
-            textPaintFolder.textSize = textSize
-            ascent = textPaintFolder.ascent()
-            descent = textPaintFolder.descent()
+        /** Updates the font metrics used for the layout of labels. */
+        fun updateFonts(textPaint: Paint) {
+            ascent = textPaint.ascent()
+            descent = textPaint.descent()
             fontSize = descent - ascent
         }
 
@@ -522,43 +465,34 @@ open class FileSystemEntry protected constructor(
             }
         }
 
+        /** Horizontal position of labels inside an entry. */
+        private const val LABEL_OFFSET = 6
+
         private fun clippedName(entry: FileSystemEntry, paint: Paint): String {
-            val cliplen = paint.breakText(entry.name, true, (elementWidth - 4).toFloat(), null)
+            val maxWidth = (elementWidth - LABEL_OFFSET - 3).toFloat()
+            val cliplen = paint.breakText(entry.name, true, maxWidth, null)
             return entry.name.substring(0, cliplen)
         }
 
-        // Copy pasted from paint() and changed to lower overhead on generic drawing code
-        private fun paintSpecialGPU(
-            entries: Array<FileSystemEntry>, rt: RenderingThread,
-            xoffset0: Float, yoffset0: Float, yscale: Float,
-            clipLeft0: Long, clipTop: Long, clipBottom: Long,
-            screenHeight: Int, numSpecial: Int,
+        /** Draws the name and, if there is space, the size of the entry. */
+        private fun drawLabel(
+            canvas: Canvas, skin: TreeSkin, entry: FileSystemEntry,
+            left: Float, top: Float, bottom: Float, screenHeight: Int,
         ) {
-            // Deep one level in hierarchy:
-            val children = entries[0].children!!
-            val xoffset = xoffset0 + elementWidth
-            val clipLeft = clipLeft0 - elementWidth
-            forEachSpecial(children, yoffset0, yscale, clipTop, clipBottom, numSpecial) { c, top, bottom ->
-                if (clipLeft < elementWidth) {
-                    val fontSize = fontSize
-                    // FIXME: bg_emptySpace
-                    rt.specialSquare.draw(xoffset, top, xoffset + elementWidth, bottom)
-                    if (bottom - top > fontSize * 2) {
-                        val pos = labelCenter(top, bottom, screenHeight)
-                        val cache = c.drawingCacheOrCreate
-                        cache.drawText(rt, xoffset + 2, pos - descent, elementWidth - 5)
-                        cache.drawSize(rt, xoffset + 2, pos - ascent, elementWidth - 5)
-                    } else if (bottom - top > fontSize) {
-                        c.drawingCacheOrCreate.drawText(
-                            rt, xoffset + 2, (top + bottom - ascent - descent) / 2, elementWidth - 5)
-                    }
-                }
+            val paint = skin.textPaint
+            val x = left + LABEL_OFFSET
+            if (bottom - top > fontSize * 2) {
+                val pos = labelCenter(top, bottom, screenHeight)
+                canvas.drawText(clippedName(entry, paint), x, pos - descent, paint)
+                canvas.drawText(entry.cachedSizeString(), x, pos - ascent, paint)
+            } else if (bottom - top > fontSize) {
+                canvas.drawText(clippedName(entry, paint), x, (top + bottom - ascent - descent) / 2, paint)
             }
         }
 
         // Copy pasted from paint() and changed to lower overhead on generic drawing code
         private fun paintSpecial(
-            entries: Array<FileSystemEntry>, canvas: Canvas,
+            entries: Array<FileSystemEntry>, canvas: Canvas, skin: TreeSkin,
             xoffset0: Float, yoffset0: Float, yscale: Float,
             clipLeft0: Long, clipTop: Long, clipBottom: Long,
             screenHeight: Int, numSpecial: Int,
@@ -569,20 +503,8 @@ open class FileSystemEntry protected constructor(
             val clipLeft = clipLeft0 - elementWidth
             forEachSpecial(children, yoffset0, yscale, clipTop, clipBottom, numSpecial) { c, top, bottom ->
                 if (clipLeft < elementWidth) {
-                    val fontSize = fontSize
-                    val right = xoffset + elementWidth
-                    canvas.drawRect(xoffset, top, right, bottom, bgEmptySpace)
-                    canvas.drawRect(xoffset, top, right, bottom, fgRect)
-                    if (bottom - top > fontSize * 2) {
-                        val pos = labelCenter(top, bottom, screenHeight)
-                        val sizeString = c.drawingCacheOrCreate.sizeString
-                        canvas.drawText(clippedName(c, textPaintFolder), xoffset + 2, pos - descent, textPaintFolder)
-                        canvas.drawText(sizeString, xoffset + 2, pos - ascent, textPaintFolder)
-                    } else if (bottom - top > fontSize) {
-                        val paint = if (c.children == null) textPaintFile else textPaintFolder
-                        canvas.drawText(clippedName(c, paint), xoffset + 2,
-                            (top + bottom - ascent - descent) / 2, paint)
-                    }
+                    skin.drawSpecial(canvas, xoffset, top, xoffset + elementWidth, bottom)
+                    drawLabel(canvas, skin, c, xoffset, top, bottom, screenHeight)
                 }
             }
         }
@@ -630,70 +552,10 @@ open class FileSystemEntry protected constructor(
             }
         }
 
-        private fun paintGPU(
-            parentSize0: Long, entries: Array<FileSystemEntry>, rt: RenderingThread,
-            xoffset: Float, yoffset0: Float, yscale: Float,
-            clipLeft: Long, clipTop: Long, clipBottom: Long, screenHeight: Int,
-        ) {
-            var parentSize = parentSize0
-            var yoffset = yoffset0
-            val childClipLeft = clipLeft - elementWidth
-            var childClipTop = clipTop
-            var childClipBottom = clipBottom
-            val childXoffset = xoffset + elementWidth
-
-            for (c in entries) {
-                val csize = c.sizeForRendering
-                parentSize -= csize
-                val top = yoffset
-                var bottom = top + csize * yscale
-
-                if (childClipTop > csize) {
-                    childClipTop -= csize
-                    childClipBottom -= csize
-                    yoffset = bottom
-                    continue
-                }
-                if (childClipBottom < 0) return
-
-                c.children?.let {
-                    paintGPU(csize, it, rt, childXoffset, yoffset, yscale,
-                        childClipLeft, childClipTop, childClipBottom, screenHeight)
-                }
-
-                if (bottom - top < 4 && deletedEntry !== c) {
-                    bottom += parentSize * yscale
-                    rt.smallSquare.draw(xoffset, top, childXoffset, bottom)
-                    return
-                }
-
-                if (clipLeft < elementWidth) {
-                    val fontSize = fontSize
-                    val square = if (c.children == null) rt.fileSquare else rt.dirSquare
-                    square.draw(xoffset, top, childXoffset, bottom)
-
-                    // FIXME: dir and file painted the same way
-                    if (bottom - top > fontSize * 2) {
-                        val pos = labelCenter(top, bottom, screenHeight)
-                        val cache = c.drawingCacheOrCreate
-                        cache.drawText(rt, xoffset + 2, pos - descent, elementWidth - 5)
-                        cache.drawSize(rt, xoffset + 2, pos - ascent, elementWidth - 5)
-                    } else if (bottom - top > fontSize) {
-                        c.drawingCacheOrCreate.drawText(
-                            rt, xoffset + 2, (top + bottom - ascent - descent) / 2, elementWidth - 5)
-                    }
-                }
-
-                childClipTop -= csize
-                childClipBottom -= csize
-                yoffset = bottom
-            }
-        }
-
         private fun paint(
-            parentSize0: Long, entries: Array<FileSystemEntry>, canvas: Canvas,
+            parentSize0: Long, entries: Array<FileSystemEntry>, canvas: Canvas, skin: TreeSkin,
             xoffset: Float, yoffset0: Float, yscale: Float,
-            clipLeft: Long, clipTop: Long, clipBottom: Long, screenHeight: Int,
+            clipLeft: Long, clipTop: Long, clipBottom: Long, clipRight: Float, screenHeight: Int,
         ) {
             var parentSize = parentSize0
             var yoffset = yoffset0
@@ -716,33 +578,27 @@ open class FileSystemEntry protected constructor(
                 }
                 if (childClipBottom < 0) return
 
-                c.children?.let {
-                    paint(csize, it, canvas, childXoffset, yoffset, yscale,
-                        childClipLeft, childClipTop, childClipBottom, screenHeight)
+                // Children are not visible right of the screen
+                if (childXoffset < clipRight) {
+                    c.children?.let {
+                        paint(csize, it, canvas, skin, childXoffset, yoffset, yscale,
+                            childClipLeft, childClipTop, childClipBottom, clipRight, screenHeight)
+                    }
                 }
 
                 if (bottom - top < 4 && deletedEntry !== c) {
                     bottom += parentSize * yscale
-                    canvas.drawRect(xoffset, top, childXoffset, bottom, fillBg)
-                    canvas.drawRect(xoffset, top, childXoffset, bottom, fgRect)
+                    skin.drawSmall(canvas, xoffset, top, childXoffset, bottom)
                     return
                 }
 
                 if (clipLeft < elementWidth) {
-                    val fontSize = fontSize
-                    canvas.drawRect(xoffset, top, childXoffset, bottom, bg)
-                    canvas.drawRect(xoffset, top, childXoffset, bottom, fgRect)
-                    val paint = if (c.children == null) textPaintFile else textPaintFolder
-
-                    if (bottom - top > fontSize * 2) {
-                        val pos = labelCenter(top, bottom, screenHeight)
-                        val sizeString = c.drawingCacheOrCreate.sizeString
-                        canvas.drawText(clippedName(c, paint), xoffset + 2, pos - descent, paint)
-                        canvas.drawText(sizeString, xoffset + 2, pos - ascent, paint)
-                    } else if (bottom - top > fontSize) {
-                        canvas.drawText(clippedName(c, paint), xoffset + 2,
-                            (top + bottom - ascent - descent) / 2, paint)
+                    if (c.children == null) {
+                        skin.drawFile(canvas, xoffset, top, childXoffset, bottom)
+                    } else {
+                        skin.drawDir(canvas, xoffset, top, childXoffset, bottom)
                     }
+                    drawLabel(canvas, skin, c, xoffset, top, bottom, screenHeight)
                 }
 
                 childClipTop -= csize

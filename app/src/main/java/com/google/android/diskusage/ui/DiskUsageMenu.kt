@@ -161,14 +161,6 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
             }
         }
 
-        menu.item(R.string.rederer) {
-            diskusage.rendererManager.switchRenderer(masterRoot)
-        }.apply {
-            viewModel.rendererButtonTitle.observe(diskusage) {
-                title = it
-            }
-        }
-
         viewModel.toolbarActionButtonVisible.observe(diskusage) {
             menu.forEach { item -> item.isVisible = it }
         }
@@ -230,13 +222,6 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
 
         viewModel.enableRescanButton()
         viewModel.showToolbarActionButton()
-
-        val title = if (state.isGPU) {
-            diskusage.getString(R.string.software_renderer)
-        } else {
-            diskusage.getString(R.string.hardware_renderer)
-        }
-        viewModel.setRendererButtonTitle(title)
 
         val selected = selectedEntity
         val view = selected != null &&

@@ -39,7 +39,7 @@ class FileSystemPackage private constructor(
     }
 
     fun applyFilter(blockSize: Long) {
-        clearDrawingCache()
+        clearSizeStringCache()
         val entries = publicChildren + listOf(
             makeNode(null, "apk").initSizeInBytes(codeSize, blockSize),
             makeNode(null, "data").initSizeInBytes(dataSize, blockSize),
