@@ -39,7 +39,7 @@ Download the latest APK from the [releases](https://github.com/taketake5656/disk
 | Usage access | Displaying the data and cache size of apps (optional) |
 
 The app asks for the missing permissions one by one when showing a storage.
-On rooted devices, all the mount points can be displayed as well.
+On rooted devices, the whole system can be scanned with root access as well (see [Rooted devices](#rooted-devices)).
 
 ## Usage
 
@@ -48,6 +48,19 @@ On rooted devices, all the mount points can be displayed as well.
 - The menu opens the selected file or directory in another app, or deletes it.
 - The magnifier icon searches files and directories by name.
 - The app language can be changed in the system settings (Settings > Apps > DiskUsage > Language).
+
+## Rooted devices
+
+On devices rooted with Magisk, KernelSU, APatch and so on, DiskUsage can use root access to
+find the size of the areas which apps can't see.
+
+- Select "[Root required]" in the list of storages, and the mount points such as `/data` and `/system` are added to it.
+  Virtual file systems and mount points which show the same files again are left out.
+- Selecting one of them asks for root access in the root manager app. When it's granted, the scan includes the data of the other apps (`/data/data` and so on).
+- "[Show/hide]" in the list chooses the mount points to show.
+- The scans with root access are view only: nothing can be deleted there.
+- When root access isn't granted, the app tells so. Allow DiskUsage in the root manager app
+  (Magisk may deny the request by itself when it isn't answered, and remember that).
 
 ## Building
 
