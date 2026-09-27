@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file PermissionRequestActivity.kt
+ * @brief 必要な権限を順に確認してからメイン画面を開く画面。
+ */
 package com.google.android.diskusage.ui
 
 import android.Manifest
@@ -41,28 +45,42 @@ import com.google.android.diskusage.filesystem.mnt.MountPoint
 import splitties.toast.toast
 import timber.log.Timber
 
-/** Asks for the missing permissions one by one, then opens [DiskUsage]. */
+/**
+ * @brief 足りない権限を 1 つずつ確認し、その後 DiskUsage(メイン画面)を開く。
+ *
+ * 全ファイルへのアクセス(Android 10 以前はストレージの権限)、
+ * アプリの容量も表示するストレージなら使用状況へのアクセス、の順に確認する。
+ * 拒否されても、見られる範囲で表示を続ける。
+ */
 class PermissionRequestActivity : ComponentActivity() {
     private lateinit var mountPoint: MountPoint
     private var storageRequested = false
     private var usageAccessRequested = false
 
+    /** @brief メイン画面を開き、閉じたらその結果をそのまま返して閉じる。 */
     private val diskUsage =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             setResult(0, result.data)
             finish()
         }
 
+    /** @brief 設定画面を開き、戻ったら次の権限の確認に進む。 */
     private val settings =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             requestNextPermission()
         }
 
+    /** @brief ストレージの権限を要求し、結果が出たら次の権限の確認に進む(Android 10 以前)。 */
     private val storagePermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             requestNextPermission()
         }
 
+    /**
+     * @brief 対象のストレージを取り出し、権限の確認を始める。
+     *
+     * 再作成時は、起動した画面の結果を待っているので確認をやり直さない。
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(ActivityCommonBinding.inflate(layoutInflater).root)
@@ -82,12 +100,19 @@ class PermissionRequestActivity : ComponentActivity() {
         requestNextPermission()
     }
 
+    /** @brief どの権限まで確認したかを保存する。 */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(STORAGE_REQUESTED_KEY, storageRequested)
         outState.putBoolean(USAGE_ACCESS_REQUESTED_KEY, usageAccessRequested)
     }
 
+    /**
+     * @brief まだ確認していない、足りない権限を 1 つ要求する。なければメイン画面を開く。
+     *
+     * ストレージへのアクセスが拒否されたままならトーストで知らせる。
+     * 使用状況へのアクセスは、説明のダイアログを出してから設定画面を開く。
+     */
     private fun requestNextPermission() {
         if (!isExternalStorageAccessGranted()) {
             if (!storageRequested) {
@@ -115,6 +140,7 @@ class PermissionRequestActivity : ComponentActivity() {
         forwardToDiskUsage()
     }
 
+    /** @brief ストレージの識別子と保存状態を渡してメイン画面を開く。 */
     private fun forwardToDiskUsage() {
         diskUsage.launch(Intent(this, DiskUsage::class.java).apply {
             putExtra(DiskUsage.KEY_KEY, intent.getStringExtra(DiskUsage.KEY_KEY))
@@ -122,6 +148,10 @@ class PermissionRequestActivity : ComponentActivity() {
         })
     }
 
+    /**
+     * @brief ストレージ全体にアクセスできるかを調べる。
+     * @return Android 11 以降は全ファイルへのアクセス、それより前はストレージの権限があれば true
+     */
     private fun isExternalStorageAccessGranted(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Environment.isExternalStorageManager()
@@ -131,6 +161,12 @@ class PermissionRequestActivity : ComponentActivity() {
             }
         }
 
+    /**
+     * @brief ストレージへのアクセスを要求する。
+     *
+     * Android 11 以降はこのアプリの「全ファイルへのアクセス」の設定画面
+     * (開けなければアプリ一覧の画面)を、それより前は権限のダイアログを出す。
+     */
     private fun requestExternalStoragePermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             storagePermissions.launch(STORAGE_PERMISSIONS)
@@ -145,6 +181,9 @@ class PermissionRequestActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * @brief このアプリの「使用状況へのアクセス」の設定画面を開く(開けなければアプリ一覧の画面)。
+     */
     private fun requestUsageAccess() {
         // The setting of this app, instead of the list of all the apps (Android 10+)
         try {
@@ -156,6 +195,10 @@ class PermissionRequestActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * @brief 使用状況へのアクセスが許可されているかを調べる。
+     * @return 許可されていれば true
+     */
     private fun isUsageAccessGranted(): Boolean {
         val mode = getSystemService<AppOpsManager>()!!
             .checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), packageName)

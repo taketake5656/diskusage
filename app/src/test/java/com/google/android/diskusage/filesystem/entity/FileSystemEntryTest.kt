@@ -1,3 +1,7 @@
+/**
+ * @file FileSystemEntryTest.kt
+ * @brief FileSystemEntry のツリー操作のテスト。
+ */
 package com.google.android.diskusage.filesystem.entity
 
 import org.junit.Assert.assertEquals
@@ -7,6 +11,11 @@ import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * @brief FileSystemEntry のサイズ計算、パス、位置、削除と追加、検索、兄弟、コピーを確かめる。
+ *
+ * ツリーは次のとおり: Storage(/sdcard)の下に A(a1.bin, a2.txt)、c.jpg、B(b1.bin)。
+ */
 class FileSystemEntryTest {
     private lateinit var superRoot: FileSystemSuperRoot
     private lateinit var root: FileSystemRoot
@@ -17,15 +26,33 @@ class FileSystemEntryTest {
     private lateinit var b1: FileSystemEntry
     private lateinit var c: FileSystemEntry
 
+    /**
+     * @brief ファイルの項目を作る。
+     * @param name 名前
+     * @param bytes バイト数
+     * @return 項目
+     */
     private fun file(name: String, bytes: Long) =
         FileSystemFile.makeNode(null, name).initSizeInBytes(bytes, BLOCK_SIZE)
 
+    /**
+     * @brief ディレクトリの項目を作る。
+     * @param name 名前
+     * @param children 子
+     * @return 項目
+     */
     private fun dir(name: String, vararg children: FileSystemEntry) =
         FileSystemEntry.makeNode(null, name).setChildren(sorted(*children), BLOCK_SIZE)
 
+    /**
+     * @brief 項目をサイズの大きい順に並べた配列にする。
+     * @param children 項目
+     * @return 並べた配列
+     */
     private fun sorted(vararg children: FileSystemEntry) =
         arrayOf(*children).also { it.sortWith(FileSystemEntry.COMPARE) }
 
+    /** @brief テスト用のツリーを作る。 */
     @Before
     fun setUp() {
         a1 = file("a1.bin", 100 * BLOCK_SIZE)
@@ -40,6 +67,7 @@ class FileSystemEntryTest {
         superRoot.setChildren(arrayOf<FileSystemEntry>(root), BLOCK_SIZE)
     }
 
+    /** @brief ディレクトリのサイズが子の合計になり、子が大きい順に並ぶ。 */
     @Test
     fun sizesAreSummedUp() {
         assertEquals(50, a2.sizeInBlocks)
@@ -50,6 +78,7 @@ class FileSystemEntryTest {
         assertEquals(listOf(dirA, c, dirB), root.children!!.toList())
     }
 
+    /** @brief encodedSize のビット配置(ブロック数と表示用のサイズ)。 */
     @Test
     fun encodedSize() {
         assertEquals((100L shl 24) or (1L shl 18) or 400, a1.encodedSize)
@@ -59,6 +88,7 @@ class FileSystemEntryTest {
         assertEquals(7L shl 18 or 300, huge.encodedSize and ((1L shl 24) - 1))
     }
 
+    /** @brief 相対パス、絶対パスと、パスからの検索。 */
     @Test
     fun paths() {
         assertEquals("A/a1.bin", a1.path2())
@@ -70,6 +100,7 @@ class FileSystemEntryTest {
         assertNull(superRoot.getByAbsolutePath("/other/B"))
     }
 
+    /** @brief 深さ、位置、位置からの検索、ファイルの数。 */
     @Test
     fun geometry() {
         assertEquals(3, superRoot.depth(a2))
@@ -81,6 +112,7 @@ class FileSystemEntryTest {
         assertEquals(7, root.numFiles)
     }
 
+    /** @brief 削除と追加で祖先のサイズと並び順が更新される。 */
     @Test
     fun removeAndInsert() {
         a1.remove(BLOCK_SIZE)
@@ -94,6 +126,7 @@ class FileSystemEntryTest {
         assertEquals(590, superRoot.sizeInBlocks)
     }
 
+    /** @brief 検索で一致する項目だけのツリーができる。 */
     @Test
     fun filter() {
         val filtered = superRoot.filter("bin", BLOCK_SIZE) as FileSystemSuperRoot
@@ -104,6 +137,7 @@ class FileSystemEntryTest {
         assertNull(superRoot.filter("nothing", BLOCK_SIZE))
     }
 
+    /** @brief 次と前の兄弟(端では自分自身)。 */
     @Test
     fun siblings() {
         assertSame(c, dirA.next)
@@ -113,6 +147,7 @@ class FileSystemEntryTest {
         assertSame(c, dirB.prev)
     }
 
+    /** @brief コピーは別の項目で、中身と親子関係も複製される。 */
     @Test
     fun copy() {
         val copy = dirA.copy()

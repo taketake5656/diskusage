@@ -17,22 +17,36 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file RootMountPoint.kt
+ * @brief root 権限でスキャンする端末のマウントポイント。
+ */
 package com.google.android.diskusage.filesystem.mnt
 
 import com.google.android.diskusage.utils.IOHelper
 import timber.log.Timber
 
-/** Any mount point of the device, scanned with root permissions. */
+/**
+ * @brief root 権限でスキャンする、端末の任意のマウントポイント。
+ *
+ * アプリの容量は含めず、削除もできない。
+ *
+ * @param root マウントポイントのパス(表示名にも使う)
+ */
 class RootMountPoint private constructor(root: String) : MountPoint(root, root, false) {
+    /** @brief 常に root 権限が必要。 */
     override val isRootRequired: Boolean
         get() = true
 
+    /** @brief アプリの容量は含めない。 */
     override val hasApps: Boolean
         get() = false
 
+    /** @brief 削除はできない。 */
     override val isDeleteSupported: Boolean
         get() = false
 
+    /** @brief 画面間で受け渡すための識別子。 */
     override val key: String
         get() = "rooted:$root"
 
@@ -41,20 +55,35 @@ class RootMountPoint private constructor(root: String) : MountPoint(root, root, 
         private var rootedMountPointForKey = mapOf<String, MountPoint>()
         private var initialized = false
 
-        /** Sum of the line lengths of /proc/mounts, to detect changes. */
+        /** @brief /proc/mounts の各行の長さの合計。マウントの変化を検出するのに使う。 */
         var checksum = 0
             private set
 
+        /**
+         * @brief root 用のマウントポイントの一覧を返す。
+         * @return マウントポイントの一覧
+         */
         fun getRootedMountPoints(): List<MountPoint> {
             initMountPoints()
             return rootedMountPoints
         }
 
+        /**
+         * @brief 識別子から root 用のマウントポイントを探す。
+         * @param key MountPoint.key の値
+         * @return 見つかったマウントポイント。なければ null
+         */
         fun getForKey(key: String): MountPoint? {
             initMountPoints()
             return rootedMountPointForKey[key]
         }
 
+        /**
+         * @brief /proc/mounts から、ストレージのマウントポイントの一覧を作る(初回だけ)。
+         *
+         * 仮想ファイルシステムと APEX などは除く。バインドマウントは同じファイルを
+         * 重ねて見せるだけなので、デバイスごとに最も短いマウントポイントだけを残す。
+         */
         fun initMountPoints() {
             if (initialized) return
             initialized = true
@@ -85,7 +114,7 @@ class RootMountPoint private constructor(root: String) : MountPoint(root, root, 
             }
         }
 
-        /** File systems without files stored on the device. */
+        /** @brief 端末に保存されたファイルを持たない(仮想の)ファイルシステムの種類。 */
         private val virtualTypes = setOf(
             "autofs", "binder", "binderfs", "bpf", "cgroup", "cgroup2", "configfs", "debugfs",
             "devpts", "devtmpfs", "efivarfs", "functionfs", "fuse", "fusectl", "incremental-fs",
@@ -93,12 +122,19 @@ class RootMountPoint private constructor(root: String) : MountPoint(root, root, 
             "selinuxfs", "sysfs", "tmpfs", "tracefs",
         )
 
-        /** Mount point prefixes of the many small APEX images. */
+        /** @brief 多数ある小さな APEX イメージなどのマウントポイントの接頭辞。 */
         private val ignoredPrefixes = listOf("/apex/", "/bootstrap-apex/", "/mnt/asec/")
 
+        /**
+         * @brief 一覧に出すストレージかどうかを判定する。
+         * @param mountPoint マウントポイントのパス
+         * @param type ファイルシステムの種類
+         * @return 仮想ファイルシステムでなく、除外する接頭辞にも当たらなければ true
+         */
         private fun isStorage(mountPoint: String, type: String): Boolean =
             type !in virtualTypes && ignoredPrefixes.none { mountPoint.startsWith(it) }
 
+        /** @brief 一覧を破棄し、次の取得で作り直すようにする。 */
         fun reset() {
             rootedMountPoints = listOf()
             rootedMountPointForKey = mapOf()

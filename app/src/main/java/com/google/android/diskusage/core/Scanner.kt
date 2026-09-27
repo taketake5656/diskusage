@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file Scanner.kt
+ * @brief Java のファイル API によるスキャナ(ネイティブスキャナが使えないときの代替)。
+ */
 package com.google.android.diskusage.core
 
 import android.system.ErrnoException
@@ -28,8 +32,15 @@ import java.io.IOException
 import timber.log.Timber
 
 /**
- * Builds the file system tree using Java file API. Used when the native
- * scanner is not available.
+ * @brief Java のファイル API でファイルシステムのツリーを作る。
+ *
+ * ネイティブスキャナが使えないときに使う。
+ *
+ * @param maxDepth 走査する最大の深さ。これより深い部分はサイズだけを合計する
+ * @param blockSize 表示のブロックサイズ(バイト)
+ * @param allocatedBlocks ストレージの使用済みブロック数(まとめる項目のしきい値の計算に使う)
+ * @param maxHeap ツリーに使ってよいヒープの量(バイト)
+ * @param smallEntryName 小さなファイルをまとめた項目の名前
  */
 class Scanner(
     private val maxDepth: Int,
@@ -39,6 +50,12 @@ class Scanner(
     smallEntryName: SmallEntryName = SmallEntryName.DEFAULT,
 ) : TreeScanner(blockSize, allocatedBlocks, maxHeap, smallEntryName) {
 
+    /**
+     * @brief ディレクトリをスキャンしてツリーを作る。
+     * @param file スキャンするディレクトリ
+     * @return ツリーのルート
+     * @throws IOException ディレクトリが見つからないとき
+     */
     fun scan(file: LegacyFile): FileSystemEntry {
         val stat = try {
             Os.stat(file.canonicalPath)
@@ -50,6 +67,11 @@ class Scanner(
         return root.node
     }
 
+    /**
+     * @brief ファイルの stat を取得する。
+     * @param file 対象のファイル
+     * @return stat の結果。取得できなければ null
+     */
     private fun stat(file: LegacyFile): StructStat? = try {
         Os.stat(file.canonicalPath)
     } catch (e: ErrnoException) {
@@ -59,8 +81,15 @@ class Scanner(
     }
 
     /**
-     * Scans the directory and all its descendants. Size of the directory is
-     * calculated as a sum of all its children.
+     * @brief ディレクトリとその子孫をすべてスキャンする。
+     *
+     * ディレクトリのサイズは、自身のブロックと子のサイズの合計になる。
+     *
+     * @param parent 親の項目
+     * @param file スキャンするディレクトリ
+     * @param depth ルートからの深さ
+     * @param selfBlocks ディレクトリ自身のブロック数
+     * @return 作成した項目と、そのヒープ使用量・ディレクトリ数・ファイル数
      */
     private fun scanDirectory(
         parent: FileSystemEntry?, file: LegacyFile, depth: Int, selfBlocks: Long,
@@ -100,9 +129,9 @@ class Scanner(
     }
 
     /**
-     * Calculate size of the entry reading directory tree
-     * @param file is file corresponding to this entry
-     * @return size of entry in blocks
+     * @brief ディレクトリのツリーをたどって項目のサイズを計算する(項目は作らない)。
+     * @param file 項目に対応するファイル
+     * @return 項目のサイズ(ブロック数)。リンクは 0
      */
     private fun calculateSize(file: LegacyFile): Long {
         if (file.isLink) return 0

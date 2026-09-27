@@ -17,11 +17,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file FileSystemEntrySmall.kt
+ * @brief 小さなファイルをまとめた項目(「<N 個のファイル>」)。
+ */
 package com.google.android.diskusage.filesystem.entity
 
 /**
- * Aggregates small files and directories of a directory, which are too small
- * to be displayed separately.
+ * @brief 個別に表示するには小さすぎるファイルやディレクトリを、ディレクトリごとにまとめた項目。
+ *
+ * ヒープの予算を超えたときに TreeScanner が作る。
+ *
+ * @param parent 親ディレクトリの項目
+ * @param name 表示名(「<N 個のファイル>」)
+ * @param numFiles まとめたファイルの数
  */
 class FileSystemEntrySmall(
     parent: FileSystemEntry?,
@@ -29,7 +38,12 @@ class FileSystemEntrySmall(
     override val numFiles: Int,
 ) : FileSystemEntry(parent, name) {
 
+    /**
+     * @brief 同じ内容の空の項目を作る(コピー用)。
+     * @return 新しい項目
+     */
     override fun create(): FileSystemEntry = FileSystemEntrySmall(null, name, numFiles)
 
+    /** @brief 検索結果には含めない。 @return 常に null */
     override fun filter(pattern: CharSequence, blockSize: Long): FileSystemEntry? = null
 }

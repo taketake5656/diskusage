@@ -1,3 +1,7 @@
+/**
+ * @file ShowHideMountPointsActivity.kt
+ * @brief root 化した端末で、選択画面に出すマウントポイントを選ぶ画面。
+ */
 package com.google.android.diskusage.ui
 
 import android.content.Context
@@ -12,9 +16,12 @@ import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import com.google.android.diskusage.filesystem.mnt.RootMountPoint
 import com.google.android.diskusage.utils.applySystemBarsPadding
 
-/** Lets the user hide mount points of a rooted device. */
+/**
+ * @brief root 化した端末のマウントポイントを、表示するかどうか利用者が選ぶ画面。
+ */
 class ShowHideMountPointsActivity : AppCompatActivity() {
 
+    /** @brief マウントポイント一覧のフラグメントを表示する。 */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySystemBarsPadding()
@@ -25,10 +32,17 @@ class ShowHideMountPointsActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * @brief マウントポイントごとのチェックボックスの一覧。
+     *
+     * チェックを外したマウントポイントは SharedPreferences `ignore_list` に記録する。
+     */
     class MountPointsFragment : PreferenceFragmentCompat() {
+        /** @brief 非表示にするマウントポイントを記録する SharedPreferences。 */
         private val ignoreList
             get() = requireContext().getSharedPreferences("ignore_list", Context.MODE_PRIVATE)
 
+        /** @brief 空の設定画面を作る(項目は onResume で並べる)。 */
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
                 title = getString(R.string.setup_visible_mount_points)
@@ -36,6 +50,7 @@ class ShowHideMountPointsActivity : AppCompatActivity() {
             }
         }
 
+        /** @brief マウントポイントを読み直し、使用量と表示状態を付けて並べる。 */
         override fun onResume() {
             super.onResume()
             val context = requireContext()
@@ -52,6 +67,7 @@ class ShowHideMountPointsActivity : AppCompatActivity() {
             }
         }
 
+        /** @brief チェックを外したマウントポイントを保存する。 */
         override fun onPause() {
             super.onPause()
             ignoreList.edit {

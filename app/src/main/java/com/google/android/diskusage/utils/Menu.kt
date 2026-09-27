@@ -1,3 +1,7 @@
+/**
+ * @file Menu.kt
+ * @brief メニュー項目を簡単に作るための拡張関数。
+ */
 package com.google.android.diskusage.utils
 
 import android.content.res.ColorStateList
@@ -10,6 +14,14 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import splitties.resources.drawable
 
+/**
+ * @brief メニュー項目のアイコン、表示方法、クリック時の処理を設定する。
+ * @param icon アイコン(0 なら設定しない)
+ * @param iconTint アイコンの色(0 なら設定しない)
+ * @param showAsAction true なら余裕があればツールバーに表示する
+ * @param onClick クリック時の処理。false を返したときだけ未処理とみなす
+ * @return この項目
+ */
 fun MenuItem.setup(
     @DrawableRes icon: Int,
     @ColorInt iconTint: Int,
@@ -36,6 +48,15 @@ fun MenuItem.setup(
     return this
 }
 
+/**
+ * @brief 文字列リソースのタイトルでメニュー項目を追加する。
+ * @param title タイトルの文字列リソース
+ * @param icon アイコン
+ * @param iconTint アイコンの色
+ * @param showAsAction true なら余裕があればツールバーに表示する
+ * @param onClick クリック時の処理
+ * @return 追加した項目
+ */
 fun Menu.item(
     @StringRes title: Int,
     @DrawableRes icon: Int = 0,
@@ -47,6 +68,15 @@ fun Menu.item(
     return item
 }
 
+/**
+ * @brief 文字列のタイトルでメニュー項目を追加する。
+ * @param title タイトル
+ * @param icon アイコン
+ * @param iconTint アイコンの色
+ * @param showAsAction true なら余裕があればツールバーに表示する
+ * @param onClick クリック時の処理
+ * @return 追加した項目
+ */
 fun Menu.item(
     title: CharSequence,
     @DrawableRes icon: Int = 0,
@@ -58,6 +88,15 @@ fun Menu.item(
     return item
 }
 
+/**
+ * @brief サブメニューを追加する。
+ * @param title タイトルの文字列リソース
+ * @param icon アイコン
+ * @param iconTint アイコンの色
+ * @param showAsAction true なら余裕があればツールバーに表示する
+ * @param initSubMenu サブメニューの項目を追加する処理
+ * @return 追加したサブメニュー
+ */
 fun Menu.subMenu(
     @StringRes title: Int,
     @DrawableRes icon: Int,

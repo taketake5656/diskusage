@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file FileSystemStats.kt
+ * @brief マウントポイントのブロック使用量。
+ */
 package com.google.android.diskusage.filesystem
 
 import android.content.Context
@@ -26,11 +30,21 @@ import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import com.google.android.diskusage.filesystem.mnt.MountPoint
 import timber.log.Timber
 
-/** Block usage of a mount point. */
+/**
+ * @brief マウントポイントのブロック使用量(StatFs の値)。
+ *
+ * 取得できないときはブロックサイズ 512、その他は 0 になる。
+ *
+ * @param mountPoint 対象のマウントポイント
+ */
 class FileSystemStats(mountPoint: MountPoint) {
+    /** @brief ブロックサイズ(バイト)。 */
     val blockSize: Long
+    /** @brief アプリが使える空きブロック数。 */
     val freeBlocks: Long
+    /** @brief 使用中のブロック数(総数 - 空き)。 */
     val busyBlocks: Long
+    /** @brief ブロックの総数。 */
     val totalBlocks: Long
 
     init {
@@ -53,6 +67,11 @@ class FileSystemStats(mountPoint: MountPoint) {
         }
     }
 
+    /**
+     * @brief 「使用量 / 総容量」の表示文字列を作る。
+     * @param context 文字列リソースの取得に使う Context
+     * @return 表示文字列。容量が取得できていなければ「不明」の文字列
+     */
     fun formatUsageInfo(context: Context): String {
         if (totalBlocks == 0L) return context.getString(R.string.usage_info_unknown)
         return context.getString(

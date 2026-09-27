@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file FileSystemState.kt
+ * @brief ツリー表示の状態(カーソル、拡大縮小、アニメーション、入力)。
+ */
 package com.google.android.diskusage.ui
 
 import android.graphics.Canvas
@@ -36,13 +40,21 @@ import splitties.toast.toast
 import timber.log.Timber
 
 /**
- * State of the file system view: cursor, zoom, animations and touch handling.
+ * @brief ファイルシステムの表示状態。カーソル、拡大縮小、アニメーション、タッチ操作を扱う。
+ *
+ * 縦方向はツリーの座標(描画単位、FileSystemEntry.sizeForRendering)で表示範囲を持ち、
+ * 横方向は表示範囲の左端の深さで持つ。目標の範囲に向けてアニメーションする。
+ * メインスレッドだけで扱う。
+ *
+ * @param context メイン画面
+ * @param root 表示するツリー
  */
 class FileSystemState(
     private val context: DiskUsage,
     root: FileSystemSuperRoot,
 ) {
     private lateinit var view: FileSystemView
+    /** @brief 表示しているツリー。 */
     var masterRoot: FileSystemSuperRoot = root
         private set
     private lateinit var cursor: Cursor
@@ -109,6 +121,11 @@ class FileSystemState(
     private var deletingAnimationStartTime = 0L
     private var deletingInitialSize = 0L
 
+    /**
+     * @brief 拡大の状態。
+     *
+     * ZOOM_FULL は空き容量を含む全体、ZOOM_ALLOCATED は使用済みの部分、ZOOM_OTHER はそれ以外。
+     */
     private enum class ZoomState {
         ZOOM_FULL,
         ZOOM_ALLOCATED,
@@ -123,22 +140,46 @@ class FileSystemState(
         resetCursor()
     }
 
+    /** @brief 複数の指によるピンチ操作(縦横の拡大縮小と移動)を扱う。 */
     inner class MultiTouchHandler {
         private val filterX = ArrayList<MotionFilter>()
         private val filterY = ArrayList<MotionFilter>()
 
+        /**
+         * @brief i 本目の指の x 座標のフィルタを返す(なければ作る)。
+         * @param i 指の番号
+         * @return フィルタ
+         */
         private fun getFilterX(i: Int): MotionFilter {
             if (filterX.size <= i) filterX.add(MotionFilter())
             return filterX[i]
         }
 
+        /**
+         * @brief i 本目の指の y 座標のフィルタを返す(なければ作る)。
+         * @param i 指の番号
+         * @return フィルタ
+         */
         private fun getFilterY(i: Int): MotionFilter {
             if (filterY.size <= i) filterY.add(MotionFilter())
             return filterY[i]
         }
 
+        /**
+         * @brief タッチイベントの値をコピーする。
+         * @param ev タッチイベント
+         * @return コピー
+         */
         fun newMyMotionEvent(ev: MotionEvent) = MyMotionEvent(ev)
 
+        /**
+         * @brief 複数の指によるタッチを処理する。
+         *
+         * 指の間隔で表示範囲の高さと項目の幅を、指の中心で位置を決める。
+         *
+         * @param ev タッチイベント
+         * @return 複数の指のイベントとして処理したら true(1 本なら false)
+         */
         internal fun handleTouch(ev: MyMotionEvent): Boolean {
             val action = ev.action
             val num = ev.pointerCount
@@ -213,8 +254,18 @@ class FileSystemState(
         }
     }
 
+    /** @brief 複数の指によるタッチの処理。 */
     val multitouchHandler = MultiTouchHandler()
 
+    /**
+     * @brief 1 本の指のドラッグで表示範囲を動かし、フリング用の速度を記録する。
+     *
+     * 少し動くまではタップとみなして動かさない。画面の 60% までははみ出して動かせる。
+     *
+     * @param newTouchX 指の x 座標
+     * @param newTouchY 指の y 座標
+     * @param moveTime イベントの時刻
+     */
     private fun onMotion(newTouchX: Float, newTouchY: Float, moveTime: Long) {
         val touchOffsetX = newTouchX - touchX
         val touchOffsetY = newTouchY - touchY
@@ -261,12 +312,17 @@ class FileSystemState(
         requestRepaint()
     }
 
-    /** Filters out small movements of a finger. */
+    /** @brief 指の小さな揺れを取り除くフィルタ。 */
     class MotionFilter {
         private var cur = 0f
         private var cur2 = 0f
         private var dx2 = 0f
 
+        /**
+         * @brief フィルタをリセットし、値をそのまま返す。
+         * @param value 座標
+         * @return value
+         */
         fun noFilter(value: Float): Float {
             cur = value
             cur2 = value
@@ -274,6 +330,11 @@ class FileSystemState(
             return value
         }
 
+        /**
+         * @brief 値にフィルタをかける。dx 以内の揺れは無視し、動き続けるほど追従を速くする。
+         * @param value 座標
+         * @return フィルタ後の座標
+         */
         fun doFilter(value: Float): Float {
             if (value > cur + dx) {
                 cur += value - (cur + dx)
@@ -293,6 +354,7 @@ class FileSystemState(
         }
 
         companion object {
+            /** @brief 無視する揺れの幅(画面の大きさから決める)。 */
             var dx = 5f
         }
     }
@@ -300,7 +362,10 @@ class FileSystemState(
     private val filterX = MotionFilter()
     private val filterY = MotionFilter()
 
-    /** Copy of a [MotionEvent] which can be passed to the rendering thread. */
+    /**
+     * @brief MotionEvent の値のコピー(元のイベントは再利用されるため)。
+     * @param ev 元のイベント
+     */
     class MyMotionEvent(ev: MotionEvent) {
         val eventTime: Long = ev.eventTime
         val x: Float = ev.x
@@ -310,10 +375,20 @@ class FileSystemState(
         private val xx = FloatArray(pointerCount) { ev.getX(it) }
         private val yy = FloatArray(pointerCount) { ev.getY(it) }
 
+        /** @brief i 本目の指の x 座標を返す。 */
         fun getX(i: Int) = xx[i]
+        /** @brief i 本目の指の y 座標を返す。 */
         fun getY(i: Int) = yy[i]
     }
 
+    /**
+     * @brief タッチイベントを処理する。
+     *
+     * タップは項目の選択、ドラッグは移動、離したときはフリングする。
+     * 削除のアニメーション中は無視する。
+     *
+     * @param ev タッチイベント
+     */
     fun onTouchEvent(ev: MyMotionEvent) {
         if (sdcardIsEmpty()) return
 
@@ -384,6 +459,7 @@ class FileSystemState(
         }
     }
 
+    /** @brief 指を離したときの速度に応じて、目標の表示範囲を先へ動かす。 */
     private fun fling() {
         val touchOffsetX = speedX * 15
         val touchOffsetY = speedY * 15
@@ -410,6 +486,7 @@ class FileSystemState(
         }
     }
 
+    /** @brief カーソルを表示上のルートの最初の子に戻し、タッチの状態をリセットする。 */
     fun resetCursor() {
         // FIXME: dirty hacks
         cursor = Cursor(this, masterRoot)
@@ -417,6 +494,10 @@ class FileSystemState(
         touchMovement = false
     }
 
+    /**
+     * @brief 新しいツリーに切り替え、カーソルを作り直す。
+     * @param newRoot 新しいツリー
+     */
     private fun rescanFinished(newRoot: FileSystemSuperRoot) {
         masterRoot = newRoot
         updateSpecialEntries()
@@ -424,6 +505,13 @@ class FileSystemState(
         requestRepaint()
     }
 
+    /**
+     * @brief ツリーを差し替える(検索の絞り込みなど)。
+     *
+     * カーソルは同じパスの項目(なければその祖先)に置き、画面上の見え方がなるべく変わらないようにする。
+     *
+     * @param newRoot 新しいツリー
+     */
     fun replaceRootKeepCursor(newRoot: FileSystemSuperRoot) {
         var oldPosition = cursor.position
         val newPosition = newRoot.getEntryByName(oldPosition.path2(), false)
@@ -452,6 +540,11 @@ class FileSystemState(
         cursor.set(this, newPosition)
     }
 
+    /**
+     * @brief 読み込み直後の表示を始める。
+     * @param newRoot 新しいツリー(null なら今のまま)
+     * @param animate true なら全体が縮んで収まるアニメーションをする
+     */
     fun startZoomAnimation(newRoot: FileSystemSuperRoot?, animate: Boolean) {
         if (newRoot != null) rescanFinished(newRoot)
         if (animate) {
@@ -471,14 +564,23 @@ class FileSystemState(
         requestRepaint()
     }
 
+    /**
+     * @brief 描画先のビューを設定する。
+     * @param view ビュー
+     */
     fun setView(view: FileSystemView) {
         this.view = view
     }
 
+    /**
+     * @brief カーソルの移動をメイン画面に知らせる(タイトルとメニューの更新)。
+     * @param position 選択中の項目
+     */
     internal fun onCursorMoved(position: FileSystemEntry) {
         context.setSelectedEntity(position)
     }
 
+    /** @brief 表示上のルートの中から、空き容量とシステムの領域の項目を探し直す。 */
     private fun updateSpecialEntries() {
         numSpecialEntries = 0
         freeSpace = null
@@ -497,6 +599,10 @@ class FileSystemState(
         }
     }
 
+    /**
+     * @brief 描画の前に、アニメーションの進み具合から今の表示範囲と倍率を計算する。
+     * @return アニメーション中なら true
+     */
     private fun preDraw(): Boolean {
         fadeAwayEntry()
 
@@ -527,6 +633,11 @@ class FileSystemState(
         return animation
     }
 
+    /**
+     * @brief 描画の後に、表示範囲がツリーの外にはみ出していれば戻すアニメーションを始める。
+     * @param animation アニメーション中かどうか
+     * @return 続けて再描画が必要なら true
+     */
     private fun postDraw(animation: Boolean): Boolean {
         if (animation) {
             return true
@@ -562,6 +673,11 @@ class FileSystemState(
 
     private val drawBounds = Rect()
 
+    /**
+     * @brief ツリーを描画する。アニメーション中は再描画を続ける。
+     * @param canvas 描画先
+     * @param skin 見た目
+     */
     fun onDraw(canvas: Canvas, skin: TreeSkin) {
         try {
             val animation = preDraw()
@@ -580,6 +696,10 @@ class FileSystemState(
         }
     }
 
+    /**
+     * @brief 今の表示範囲をアニメーションの開始点として記録する。
+     * @param time アニメーションの開始時刻
+     */
     fun prepareMotion(time: Long) {
         animationDuration = 900
         prevViewDepth = viewDepth
@@ -589,6 +709,15 @@ class FileSystemState(
         animationStartTime = time
     }
 
+    /**
+     * @brief タップした項目を選択し、見やすいように拡大する。
+     *
+     * 表示上のルートか空き容量なら全体と使用済みの部分の表示を切り替える。
+     * ディレクトリは、同じ項目をもう一度タップすると画面いっぱいに拡大する。
+     *
+     * @param entry タップした項目
+     * @param eventTime イベントの時刻
+     */
     private fun touchSelect(entry: FileSystemEntry, eventTime: Long) {
         val prevCursor = cursor.position
         val prevDepth = cursor.depth
@@ -659,6 +788,10 @@ class FileSystemState(
         }
     }
 
+    /**
+     * @brief 選択中の項目にラベルが入るように拡大する。
+     * @param eventTime イベントの時刻
+     */
     private fun zoomFitLabel(eventTime: Long) {
         val positionSize = cursor.position.sizeForRendering
         if (positionSize == 0L) return
@@ -687,6 +820,10 @@ class FileSystemState(
         }
     }
 
+    /**
+     * @brief 選択中の項目にラベルが入るように拡大し、項目が見えるように上へ動かす。
+     * @param eventTime イベントの時刻
+     */
     private fun zoomFitLabelMoveUp(eventTime: Long) {
         val positionSize = cursor.position.sizeForRendering
         if (positionSize == 0L) return
@@ -710,6 +847,10 @@ class FileSystemState(
         requestRepaint()
     }
 
+    /**
+     * @brief 選択中の項目が画面に収まっていなければ、親全体が見えるように縮小する。
+     * @param eventTime イベントの時刻
+     */
     private fun zoomFitToScreen(eventTime: Long) {
         if (targetViewTop < cursor.top &&
             targetViewBottom > cursor.top + cursor.position.sizeForRendering
@@ -727,6 +868,11 @@ class FileSystemState(
         requestRepaint()
     }
 
+    /**
+     * @brief カーソルを親に移す。
+     * @param eventTime イベントの時刻
+     * @return 移動したら true(既に最上位なら false)
+     */
     private fun back(eventTime: Long): Boolean {
         val newPosition = cursor.position.parent
         if (newPosition == null || newPosition === masterRoot) {
@@ -750,6 +896,10 @@ class FileSystemState(
         return true
     }
 
+    /**
+     * @brief カーソルが項目の上にあれば、前の兄弟か親に移す(削除の前に呼ぶ)。
+     * @param entry 削除する項目
+     */
     private fun moveAwayCursor(entry: FileSystemEntry) {
         if (cursor.position !== entry) return
         cursor.up(this)
@@ -757,12 +907,20 @@ class FileSystemState(
         cursor.left(this)
     }
 
-    /** Removes the entry with an animation. */
+    /**
+     * @brief 項目をアニメーションしながらツリーから取り除く。
+     * @param entry 取り除く項目
+     */
     fun removeEntry(entry: FileSystemEntry) {
         fadeAwayEntryStart(entry)
         requestRepaint()
     }
 
+    /**
+     * @brief 削除中の項目をツリーから取り除き、その分を空き容量に加える。
+     *
+     * 並べ直すときは、特別な項目が末尾に残るようにする。
+     */
     private fun deleteDeletingEntry() {
         val deletingEntry = deletingEntry!!
         if (deletingEntry.parent === masterRoot) {
@@ -800,6 +958,10 @@ class FileSystemState(
         cursor.set(this, cursor.position)
     }
 
+    /**
+     * @brief 項目が縮んで消えるアニメーションを始める(前の削除が残っていれば先に終わらせる)。
+     * @param entry 削除する項目
+     */
     private fun fadeAwayEntryStart(entry: FileSystemEntry) {
         if (deletingEntry != null) {
             deleteDeletingEntry()
@@ -810,10 +972,17 @@ class FileSystemState(
         deletingInitialSize = entry.sizeInBlocks
     }
 
+    /** @brief 再描画を要求する。 */
     fun requestRepaint() {
         view.invalidate()
     }
 
+    /**
+     * @brief 削除のアニメーションを 1 コマ進める。
+     *
+     * 項目のサイズを時間とともに減らし、その分を祖先から引いて空き容量に加える。
+     * 子は収まる分だけ残して切り詰める。時間が過ぎたら取り除く。
+     */
     private fun fadeAwayEntry() {
         var entry = deletingEntry ?: return
 
@@ -875,7 +1044,7 @@ class FileSystemState(
         }
     }
 
-    /** Finishes the deletion animation, e.g. when the deletion has failed. */
+    /** @brief 削除のアニメーションを終わらせる(削除に失敗して項目を戻すときなど)。 */
     fun restore() {
         if (deletingEntry != null) {
             deleteDeletingEntry()
@@ -883,8 +1052,21 @@ class FileSystemState(
         requestRepaint()
     }
 
+    /**
+     * @brief ストレージが空か(カーソルを置ける項目がないか)を返す。
+     * @return 空なら true
+     */
     fun sdcardIsEmpty(): Boolean = cursor.position === masterRoot
 
+    /**
+     * @brief キー操作を処理する。
+     *
+     * 方向キーでカーソルを動かし、決定キーで項目を開く。検索キーと戻るキーはメイン画面に渡す。
+     *
+     * @param keyCode キーコード
+     * @param event キーイベント
+     * @return 処理したら true
+     */
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (sdcardIsEmpty()) return false
         when (keyCode) {
@@ -943,6 +1125,11 @@ class FileSystemState(
         return false
     }
 
+    /**
+     * @brief 画面の大きさから、項目の幅と操作のしきい値を決める。
+     * @param width 幅
+     * @param height 高さ
+     */
     // FIXME: can be called from different thread
     fun layout(width: Int, height: Int) {
         screenWidth = width
@@ -959,6 +1146,10 @@ class FileSystemState(
         setZoomState()
     }
 
+    /**
+     * @brief カーソルの位置と表示範囲を復元する。
+     * @param inState saveState で保存した状態
+     */
     fun restoreState(inState: Bundle) {
         val cursorName = inState.getString("cursor") ?: return
         val entry = masterRoot.getEntryByName(cursorName, true) ?: return
@@ -981,6 +1172,10 @@ class FileSystemState(
         requestRepaint()
     }
 
+    /**
+     * @brief カーソルの位置と表示範囲を保存する。
+     * @param outState 保存先
+     */
     fun saveState(outState: Bundle) {
         outState.putString("cursor", cursor.position.path2())
         outState.putFloat("viewDepth", viewDepth)
@@ -994,6 +1189,13 @@ class FileSystemState(
         })
     }
 
+    /**
+     * @brief 使用済みの部分を表示するときの、表示範囲の下端を返す。
+     *
+     * 空き容量のラベルが入るだけの高さを残す。
+     *
+     * @return 表示範囲の下端(描画単位)
+     */
     private fun getFreeSpaceZoom(): Long {
         if (freeSpaceZoom != 0L) return freeSpaceZoom
         val freeSpace = freeSpace ?: return masterRoot.sizeForRendering
@@ -1010,6 +1212,7 @@ class FileSystemState(
         return freeSpaceZoom
     }
 
+    /** @brief 拡大の状態に合わせて、目標の表示範囲を設定する。 */
     private fun setZoomState() {
         if (screenHeight == 0) return
         when (zoomState) {
@@ -1027,6 +1230,7 @@ class FileSystemState(
         }
     }
 
+    /** @brief 全体と使用済みの部分の表示を切り替える。 */
     private fun toggleZoomState() {
         zoomState = if (zoomState == ZoomState.ZOOM_ALLOCATED) {
             ZoomState.ZOOM_FULL
@@ -1037,8 +1241,11 @@ class FileSystemState(
     }
 
     private companion object {
+        /** @brief 表示範囲のアニメーションの長さ(ミリ秒)。 */
         var animationDuration = 900L
+        /** @brief 削除のアニメーションの長さ(ミリ秒)。 */
         const val DELETION_ANIMATION_DURATION = 900L
+        /** @brief 削除のアニメーション中に無視する方向キーと決定キー。 */
         val NAVIGATION_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_DPAD_LEFT,

@@ -1,3 +1,7 @@
+/**
+ * @file NativeScannerTest.kt
+ * @brief NativeScanner によるツリー構築のテスト。
+ */
 package com.google.android.diskusage.core
 
 import com.google.android.diskusage.filesystem.entity.FileSystemEntry
@@ -9,19 +13,32 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /**
- * Feeds [NativeScanner] with synthetic output of `scan.c` and checks the resulting tree.
+ * @brief NativeScanner に scan.c の出力を模したデータを与え、できたツリーを確かめる。
+ *
+ * 期待値は Kotlin 化する前の Java 実装の出力を記録したもの(特性テスト)。
  */
 class NativeScannerTest {
 
-    /** Builds the byte stream produced by `scan.c`. */
+    /** @brief scan.c が出力するバイト列を組み立てる。 */
     private class ScanOutput {
         private val out = ByteArrayOutputStream().apply { write(0) }
 
+        /**
+         * @brief 0 で終わるフィールドを書く。
+         * @param value 値(文字列にして書く)
+         */
         private fun field(value: Any) {
             out.write(value.toString().toByteArray())
             out.write(0)
         }
 
+        /**
+         * @brief ファイルを書く。
+         * @param name 名前
+         * @param blocks512 512 バイト単位のブロック数
+         * @param bytes バイト数
+         * @return この出力
+         */
         fun file(name: String, blocks512: Long, bytes: Long) = apply {
             out.write('F'.code)
             field(name)
@@ -29,6 +46,13 @@ class NativeScannerTest {
             field(bytes)
         }
 
+        /**
+         * @brief ディレクトリを書く(中身の後に `Z` を書く)。
+         * @param name 名前
+         * @param blocks512 ディレクトリ自身の 512 バイト単位のブロック数
+         * @param content 中身を書く処理
+         * @return この出力
+         */
         fun dir(name: String, blocks512: Long = 8, content: ScanOutput.() -> Unit) = apply {
             out.write('D'.code)
             field(name)
@@ -38,15 +62,24 @@ class NativeScannerTest {
             out.write('Z'.code)
         }
 
+        /** @brief 書いた内容を読むストリームを返す。 */
         fun stream(): InputStream = out.toByteArray().inputStream()
     }
 
+    /**
+     * @brief 出力をスキャンしてツリーを作る。
+     * @param output スキャナの出力
+     * @param allocatedBlocks ストレージの使用済みブロック数
+     * @param maxHeap ヒープの予算(バイト)
+     * @return ツリーのルート
+     */
     private fun scan(
         output: ScanOutput,
         allocatedBlocks: Long = 1_000_000,
         maxHeap: Int = 64 * 1024 * 1024,
     ): FileSystemEntry = NativeScanner(BLOCK_SIZE, allocatedBlocks, maxHeap).scan(output.stream())
 
+    /** @brief 小さなツリーの構造とサイズ(サイズ 0 のファイルは除かれる)。 */
     @Test
     fun simpleTree() {
         val root = scan(ScanOutput().dir("/storage/emulated/0") {
@@ -67,6 +100,7 @@ class NativeScannerTest {
         )
     }
 
+    /** @brief 26 階層の深いツリーを、スタックオーバーフローせずに作れる。 */
     @Test
     fun deepTreeUsesSoftStack() {
         // Deeper than 10 levels switches to the non-recursive implementation
@@ -78,6 +112,7 @@ class NativeScannerTest {
         assertGolden(GOLDEN_DEEP, dump(root))
     }
 
+    /** @brief ヒープの予算を超えるランダムなツリーで、小さなファイルがまとめられる(結果のハッシュで比較)。 */
     @Test
     fun smallFilesAreAggregated() {
         val random = Random(42)
@@ -102,6 +137,7 @@ class NativeScannerTest {
         assertGolden(GOLDEN_RANDOM, summary)
     }
 
+    /** @brief 途中で切れた出力は例外になる。 */
     @Test
     fun truncatedStreamFails() {
         val broken = byteArrayOf(0, 'D'.code.toByte(), 'x'.code.toByte(), 0, '8'.code.toByte())
@@ -113,6 +149,11 @@ class NativeScannerTest {
     companion object {
         private const val BLOCK_SIZE = 4096L
 
+        /**
+         * @brief ツリーを 1 行 1 項目の文字列にする(種類、名前、ブロック数、encodedSize)。
+         * @param entry ルート
+         * @return 字下げで階層を表した文字列
+         */
         fun dump(entry: FileSystemEntry): String = buildString {
             fun walk(e: FileSystemEntry, depth: Int) {
                 append("  ".repeat(depth))
@@ -122,14 +163,25 @@ class NativeScannerTest {
             walk(entry, 0)
         }.trim()
 
+        /**
+         * @brief 文字列の SHA-256 を返す。
+         * @param text 文字列
+         * @return 16 進数の文字列
+         */
         private fun sha256(text: String): String =
             java.security.MessageDigest.getInstance("SHA-256")
                 .digest(text.toByteArray())
                 .joinToString("") { "%02x".format(it) }
 
+        /**
+         * @brief 期待値(字下げを除いたもの)と比べる。
+         * @param golden 期待値
+         * @param actual 実際の値
+         */
         private fun assertGolden(golden: String, actual: String) =
             assertEquals(golden.trimIndent().trim(), actual)
 
+        /** @brief deepTreeUsesSoftStack の期待値。 */
         private val GOLDEN_DEEP = """
             FileSystemFile root blocks=351 enc=5889328508
               FileSystemFile d0 blocks=350 enc=5872551288
@@ -183,6 +235,7 @@ class NativeScannerTest {
                   FileSystemFile f2 blocks=2 enc=33816584
                 FileSystemFile f1 blocks=1 enc=17039364
             """
+        /** @brief smallFilesAreAggregated の期待値。 */
         private val GOLDEN_RANDOM =
             "nodes=3530 small=1091 sha256=e119b84794e8701e676a60cb51346dbe95391bd4a1b1e5cc9510ea6f51ba83bc"
     }

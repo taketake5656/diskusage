@@ -1,11 +1,25 @@
+/**
+ * @file DeviceInfo.kt
+ * @brief 不具合報告用の端末情報の文字列を作る。
+ */
 package com.google.android.diskusage.utils
 
 import android.content.Context
 import android.content.res.Configuration
 import com.google.android.diskusage.BuildConfig
 
+/**
+ * @brief アプリと端末の情報をまとめるヘルパー。
+ *
+ * https://gist.github.com/hendrawd/01f215fd332d84793e600e7f82fc154b を元にしている。
+ */
 // Adapted from https://gist.github.com/hendrawd/01f215fd332d84793e600e7f82fc154b
 object DeviceInfo {
+    /**
+     * @brief アプリのバージョン、OS、機種、画面の情報を複数行の文字列にする。
+     * @param context 画面の情報の取得に使う Context
+     * @return 1 行 1 項目の文字列
+     */
     fun get(context: Context) =
         buildString {
             appendLine("App Package Name: ${BuildConfig.APPLICATION_ID}")

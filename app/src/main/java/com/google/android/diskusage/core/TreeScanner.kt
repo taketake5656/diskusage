@@ -1,6 +1,6 @@
 /*
  * DiskUsage - displays sdcard usage on android.
- * Copyright (C) 2008-2011 Ivan Volosyuk
+ * (C) 2008-2011 Ivan Volosyuk
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file TreeScanner.kt
+ * @brief スキャナ共通の、ヒープの予算内でのツリー構築。
+ */
 package com.google.android.diskusage.core
 
 import com.google.android.diskusage.filesystem.entity.FileSystemEntry
@@ -25,11 +29,22 @@ import com.google.android.diskusage.filesystem.entity.FileSystemFile
 import java.util.PriorityQueue
 import timber.log.Timber
 
-/** Name of the entry which aggregates small files and directories. */
+/**
+ * @brief 小さなファイルやディレクトリをまとめた項目の名前を作る。
+ *
+ * 表示用の文字列はリソースから作るため、外から差し込めるようにしている。
+ */
 fun interface SmallEntryName {
+    /**
+     * @brief 名前を作る。
+     * @param numDirs まとめたディレクトリの数
+     * @param numFiles まとめたファイルの数
+     * @return 項目の名前
+     */
     fun get(numDirs: Int, numFiles: Int): String
 
     companion object {
+        /** @brief 英語の既定の名前(テストで使う)。 */
         val DEFAULT = SmallEntryName { numDirs, numFiles ->
             when {
                 numDirs == 0 -> "<$numFiles files>"
@@ -40,17 +55,24 @@ fun interface SmallEntryName {
     }
 }
 
-/** Reports the scan progress. */
+/** @brief スキャンの進捗を知らせる。 */
 interface ProgressGenerator {
+    /** @brief 最後に作ったファイルの項目(進捗ダイアログにファイル名を出すのに使う)。 */
     val lastCreatedFile: FileSystemEntry?
+    /** @brief ここまでにスキャンしたファイルの合計サイズ(ブロック数)。 */
     val pos: Long
 }
 
 /**
- * Builds the file system tree within a heap budget.
+ * @brief ヒープの予算内でファイルシステムのツリーを作る、スキャナ共通の基底クラス。
  *
- * Small files of a directory are aggregated into a single [FileSystemEntrySmall].
- * They are restored at the end of the scan if the heap budget allows it.
+ * ディレクトリ内の小さなファイルは 1 つの FileSystemEntrySmall にまとめる。
+ * スキャンの最後に、ヒープの予算が許す分だけ元に戻す。
+ *
+ * @param blockSize 表示のブロックサイズ(バイト)
+ * @param allocatedBlocks ストレージの使用済みブロック数(まとめる項目のしきい値の計算に使う)
+ * @param maxHeapSize ツリーに使ってよいヒープの量(バイト)
+ * @param smallEntryName まとめた項目の名前
  */
 abstract class TreeScanner(
     protected val blockSize: Long,
@@ -64,7 +86,7 @@ abstract class TreeScanner(
     private var heapSize = 0
     private val smallLists = PriorityQueue<SmallList>()
 
-    /** Estimated heap size of the node created by the last [makeNode] call. */
+    /** @brief 最後の makeNode で作った項目のヒープ使用量の見積もり(バイト)。 */
     protected var createdNodeSize = 0
         private set
 
@@ -80,6 +102,16 @@ abstract class TreeScanner(
             sizeThreshold / (1 shl FileSystemEntry.BLOCK_OFFSET).toFloat())
     }
 
+    /**
+     * @brief まとめた小さな項目の、元に戻す候補。
+     *
+     * ヒープあたりのサイズ(空間効率)が低いものから先に候補から外す。
+     *
+     * @param parent まとめた項目の親ディレクトリ
+     * @param children まとめた項目
+     * @param heapSize 元に戻すのに必要なヒープの量(バイト)
+     * @param blocks まとめた項目の合計サイズ(ブロック数)
+     */
     private class SmallList(
         val parent: FileSystemEntry,
         val children: Array<FileSystemEntry>,
@@ -88,10 +120,20 @@ abstract class TreeScanner(
     ) : Comparable<SmallList> {
         private val spaceEfficiency = blocks / heapSize.toFloat()
 
+        /** @brief 空間効率で比較する。 */
         override fun compareTo(other: SmallList): Int =
             spaceEfficiency.compareTo(other.spaceEfficiency)
     }
 
+    /**
+     * @brief 項目を作り、ヒープ使用量を加算する。
+     *
+     * 予算を超えたら、空間効率の低い候補から元に戻すのをあきらめる。
+     *
+     * @param parent 親の項目
+     * @param name 名前
+     * @return 作成した項目
+     */
     protected fun makeNode(parent: FileSystemEntry?, name: String): FileSystemEntry {
         createdNodeSize = (4 /* ref in FileSystemEntry[] */
             + 16 /* FileSystemEntry */
@@ -106,7 +148,13 @@ abstract class TreeScanner(
         return FileSystemFile.makeNode(parent, name)
     }
 
-    /** Scanned directory with its heap size and number of dirs and files inside. */
+    /**
+     * @brief スキャンし終えたディレクトリと、そのヒープ使用量、中のディレクトリとファイルの数。
+     * @param node ディレクトリの項目
+     * @param heapSize ヒープ使用量(バイト)
+     * @param numDirs 中のディレクトリの数(自身を含む)
+     * @param numFiles 中のファイルの数
+     */
     protected class ScannedNode(
         val node: FileSystemEntry,
         val heapSize: Int,
@@ -114,7 +162,12 @@ abstract class TreeScanner(
         val numFiles: Int,
     )
 
-    /** Collects children of a directory being scanned. */
+    /**
+     * @brief スキャン中のディレクトリの子を集める。
+     * @param node ディレクトリの項目
+     * @param nodeHeapSize ディレクトリ自身のヒープ使用量(バイト)
+     * @param selfBlocks ディレクトリ自身のブロック数
+     */
     protected inner class DirectoryBuilder(
         val node: FileSystemEntry,
         private var nodeHeapSize: Int,
@@ -130,10 +183,25 @@ abstract class TreeScanner(
         private val children = ArrayList<FileSystemEntry>()
         private val smallChildren = ArrayList<FileSystemEntry>()
 
+        /**
+         * @brief 直前の makeNode で作ったファイルを子に加える。
+         * @param file ファイルの項目
+         */
         fun addFile(file: FileSystemEntry) = add(file, createdNodeSize, dirs = 0, files = 1)
 
+        /**
+         * @brief スキャンし終えたディレクトリを子に加える。
+         * @param dir ディレクトリ
+         */
         fun addDirectory(dir: ScannedNode) = add(dir.node, dir.heapSize, dir.numDirs, dir.numFiles)
 
+        /**
+         * @brief 子を加える。ヒープ使用量に比べてサイズが小さいものは、まとめる候補にする。
+         * @param child 子の項目
+         * @param childHeapSize 子のヒープ使用量(バイト)
+         * @param dirs 子に含まれるディレクトリの数
+         * @param files 子に含まれるファイルの数
+         */
         private fun add(child: FileSystemEntry, childHeapSize: Int, dirs: Int, files: Int) {
             val childBlocks = child.sizeInBlocks
             blocks += childBlocks
@@ -151,6 +219,14 @@ abstract class TreeScanner(
             }
         }
 
+        /**
+         * @brief ディレクトリのサイズを確定し、子を並べ替えて設定する。
+         *
+         * 小さな子は、ディレクトリ全体でも小さければそのまま残し、そうでなければ
+         * FileSystemEntrySmall にまとめて末尾に置く(後で元に戻す候補にする)。
+         *
+         * @return スキャンし終えたディレクトリ
+         */
         fun finish(): ScannedNode {
             node.setSizeInBlocks(blocks + selfBlocks, blockSize)
             numDirs += numDirsSmall
@@ -191,7 +267,7 @@ abstract class TreeScanner(
         }
     }
 
-    /** Restores small files which fit into the heap budget. */
+    /** @brief ヒープの予算に収まる分だけ、まとめた小さな項目を元に戻す。 */
     protected fun restoreSmallLists() {
         var extraHeap = 0
         for (list in smallLists) {

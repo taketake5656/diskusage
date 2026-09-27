@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file Apps2SDLoader.kt
+ * @brief アプリごとのストレージ使用量の読み込み。
+ */
 package com.google.android.diskusage.filesystem
 
 import android.app.usage.StorageStatsManager
@@ -33,7 +37,10 @@ import com.google.android.diskusage.ui.DiskUsage
 import java.io.IOException
 import timber.log.Timber
 
-/** Loads storage usage of the apps. Requires the usage access permission. */
+/**
+ * @brief アプリごとのストレージ使用量を読み込む。使用状況へのアクセス権限が必要。
+ * @param diskUsage 進捗ダイアログを持つメイン画面
+ */
 @RequiresApi(Build.VERSION_CODES.O)
 class Apps2SDLoader(private val diskUsage: DiskUsage) {
     @Volatile
@@ -42,6 +49,15 @@ class Apps2SDLoader(private val diskUsage: DiskUsage) {
     @Volatile
     private var numLoadedPackages = 0
 
+    /**
+     * @brief 使用状況の統計に現れるアプリの容量を StorageStatsManager で取得する。
+     *
+     * ワーカースレッドから呼ぶ。読み込み中は 50 ms ごとに進捗ダイアログを更新する
+     * (進捗バーの残りの段階をすべて使う)。
+     *
+     * @param blockSize 表示のブロックサイズ
+     * @return アプリの項目(サイズの大きい順)
+     */
     fun load(blockSize: Long): List<FileSystemPackage> {
         val usageStatsManager = diskUsage.getSystemService<UsageStatsManager>()!!
         val storageStatsManager = diskUsage.getSystemService<StorageStatsManager>()!!

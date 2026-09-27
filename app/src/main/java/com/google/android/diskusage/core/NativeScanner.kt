@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file NativeScanner.kt
+ * @brief ネイティブスキャナ(libscan.so)の出力からツリーを作る。
+ */
 package com.google.android.diskusage.core
 
 import com.google.android.diskusage.datasource.fast.NativeScannerStream
@@ -25,14 +29,18 @@ import com.google.android.diskusage.filesystem.mnt.MountPoint
 import java.io.InputStream
 
 /**
- * Builds the file system tree from the output of the native `scan` executable.
+ * @brief ネイティブスキャナの出力からファイルシステムのツリーを作る。
  *
- * The output is a stream of zero terminated fields, started with a zero byte:
- * - `D<name>\0<blocks>\0<bytes>\0` starts a directory, followed by its children
- *   and `Z` which ends the directory,
- * - `F<name>\0<blocks>\0<bytes>\0` is a file.
+ * 出力は 0 バイトで始まり、0 で終わるフィールドが続く。
+ * - `D<名前>\0<ブロック数>\0<バイト数>\0` はディレクトリの始まり。子が続き、`Z` で終わる。
+ * - `F<名前>\0<ブロック数>\0<バイト数>\0` はファイル。
  *
- * Sizes in blocks are in 512 bytes units.
+ * ブロック数は 512 バイト単位。
+ *
+ * @param blockSize 表示のブロックサイズ(バイト)
+ * @param allocatedBlocks ストレージの使用済みブロック数(まとめる項目のしきい値の計算に使う)
+ * @param maxHeap ツリーに使ってよいヒープの量(バイト)
+ * @param smallEntryName 小さなファイルをまとめた項目の名前
  */
 class NativeScanner(
     blockSize: Long,
@@ -46,6 +54,10 @@ class NativeScanner(
     private var offset = 0
     private var allocated = 0
 
+    /**
+     * @brief 読み終えた部分を捨て、未処理のデータをバッファの先頭に詰める。
+     * @throws RuntimeException 1 つのフィールドがバッファより大きいとき
+     */
     private fun move() {
         if (offset == 0) throw RuntimeException("Error: too large entity size")
         buffer.copyInto(buffer, 0, offset, allocated)
@@ -53,6 +65,10 @@ class NativeScanner(
         offset = 0
     }
 
+    /**
+     * @brief ストリームからバッファに追加で読み込む。
+     * @throws RuntimeException データが途中で終わったとき
+     */
     private fun read() {
         if (allocated == BUFFER_SIZE) {
             move()
@@ -64,6 +80,7 @@ class NativeScanner(
         allocated += res
     }
 
+    /** @brief 1 バイト読む。 @return 読んだバイト */
     private fun getByte(): Byte {
         while (offset >= allocated) {
             read()
@@ -71,6 +88,11 @@ class NativeScanner(
         return buffer[offset++]
     }
 
+    /**
+     * @brief 0 で終わる 10 進数のフィールドを読む。
+     * @return 読んだ値
+     * @throws RuntimeException 数字以外が含まれるとき
+     */
     private fun getLong(): Long {
         var res = 0L
         while (true) {
@@ -83,6 +105,10 @@ class NativeScanner(
         }
     }
 
+    /**
+     * @brief 0 で終わる UTF-8 の文字列のフィールドを読む。
+     * @return 読んだ文字列
+     */
     private fun getString(): String {
         var startPos = offset
         while (true) {
@@ -99,12 +125,18 @@ class NativeScanner(
         }
     }
 
+    /** @brief 出力の項目の種類(NONE はディレクトリの終わり)。 */
     private enum class Type {
         NONE,
         DIR,
         FILE
     }
 
+    /**
+     * @brief 項目の種類を表す 1 文字を読む。
+     * @return 項目の種類
+     * @throws RuntimeException 不明な文字のとき
+     */
     private fun getType(): Type = when (getByte().toInt().toChar()) {
         'D' -> Type.DIR
         'F' -> Type.FILE
@@ -112,9 +144,24 @@ class NativeScanner(
         else -> throw RuntimeException("Error: incorrect entity type")
     }
 
+    /**
+     * @brief ネイティブスキャナを起動してマウントポイントをスキャンする。
+     * @param mountPoint スキャンするマウントポイント
+     * @return ツリーのルート
+     * @throws com.google.android.diskusage.datasource.fast.RootDeniedException root が使えないとき
+     */
     fun scan(mountPoint: MountPoint): FileSystemEntry =
         scan(NativeScannerStream.create(mountPoint.root, mountPoint.isRootRequired))
 
+    /**
+     * @brief スキャナの出力を読んでツリーを作る(ストリームは最後に閉じる)。
+     *
+     * 開始の 0 バイトより前の出力(su が出すメッセージなど)は読み飛ばす。
+     *
+     * @param stream スキャナの出力
+     * @return ツリーのルート
+     * @throws RuntimeException 出力の形式が正しくないとき
+     */
     fun scan(stream: InputStream): FileSystemEntry = stream.use {
         input = it
         // Skip anything printed before the start marker (e.g. by su)
@@ -130,7 +177,10 @@ class NativeScanner(
         root
     }
 
-    /** Scans the tree without recursion, which may be very deep. */
+    /**
+     * @brief ツリーを読む。階層が非常に深い場合もあるので、再帰せず明示的なスタックで処理する。
+     * @return ツリーのルート
+     */
     private fun scanTree(): FileSystemEntry {
         val stack = ArrayDeque<DirectoryBuilder>()
         stack.addLast(startDirectory(null))
@@ -157,6 +207,11 @@ class NativeScanner(
         }
     }
 
+    /**
+     * @brief ディレクトリの始まり(`D` の後)を読み、子を集める準備をする。
+     * @param parent 親ディレクトリ(ルートなら null)
+     * @return 新しいディレクトリ
+     */
     private fun startDirectory(parent: DirectoryBuilder?): DirectoryBuilder {
         val name = getString()
         val blocks = getLong() / blockSizeIn512Bytes

@@ -1,3 +1,10 @@
+/**
+ * @file scan.c
+ * @brief ネイティブスキャナ(libscan.so)。ディレクトリ以下を走査し、サイズを標準出力に書く。
+ *
+ * アプリから実行ファイルとして起動する(root が必要なときは su 経由)。出力の形式は
+ * NativeScanner.kt を参照。同じファイルシステム上の項目だけを数える。
+ */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -8,18 +15,31 @@
 #include <stdlib.h>
 
 
+/** @brief スキャンするファイルシステムのデバイス番号(別のデバイスの項目は数えない)。 */
 dev_t dev;
+/** @brief 出力のフィールドの区切り。 */
 static const int sep = 0;
 
-/*
- * Inodes seen so far, so that directories reached twice through bind mounts
- * (e.g. /data/user/0 is /data/data) and hard linked files are counted once.
+/**
+ * @brief これまでに見た inode の集合(オープンアドレス法のハッシュ表、0 は空き)。
+ *
+ * バインドマウントで 2 回たどり着くディレクトリ(例: /data/user/0 は /data/data)や
+ * ハードリンクされたファイルを 1 回だけ数えるために使う。
  */
 static ino_t *seen;
+/** @brief seen の容量(2 のべき乗)。 */
 static size_t seenCapacity;
+/** @brief seen に入っている inode の数。 */
 static size_t seenCount;
 
-/* Returns 1 if the inode was seen before, otherwise remembers it. */
+/**
+ * @brief inode を既に見たかを調べ、初めてなら覚える。
+ *
+ * 使用率が半分に達したら表を 2 倍に広げる(メモリが足りなければ覚えずに 0 を返す)。
+ *
+ * @param ino inode 番号
+ * @return 既に見ていれば 1、初めてなら 0
+ */
 static int check_seen(ino_t ino) {
   if (seenCount * 2 >= seenCapacity) {
     size_t oldCapacity = seenCapacity;
@@ -49,22 +69,33 @@ static int check_seen(ino_t ino) {
   return 0;
 }
 
+/** @brief 走査中の項目(ディレクトリの子を後で走査するため連結リストにする)。 */
 struct Entity {
-  long long sizeInBlocks;
-  long long sizeInBytes;
-  const char *name;
-  struct Entity *next;
-  char isdir;
+  long long sizeInBlocks; /**< 512 バイト単位のブロック数 */
+  long long sizeInBytes;  /**< バイト数 */
+  const char *name;       /**< 名前(malloc したもの) */
+  struct Entity *next;    /**< 次の項目 */
+  char isdir;             /**< ディレクトリなら 1 */
 };
 
 void scan_dir(const char *path, struct Entity *entity);
 
+/**
+ * @brief パスの最後の要素(名前)を返す。
+ * @param path `/` を含むパス
+ * @return path の中の名前の先頭
+ */
 const char *getName(const char *path) {
   return strrchr(path, '/') + 1;
 }
 
+/** @brief 出力した項目の数(10 件ごとに出力をフラッシュする)。 */
 int nfiles = 0;
 
+/**
+ * @brief 項目を `D` または `F` の形式で出力する。
+ * @param entity 出力する項目
+ */
 void dump_file(struct Entity *entity) {
   if (entity->isdir) {
     putchar('D');
@@ -81,10 +112,18 @@ void dump_file(struct Entity *entity) {
   if (nfiles % 10 == 0) fflush(stdout);
 }
 
+/**
+ * @brief 1 文字の記号を出力する(`Z` でディレクトリの終わり)。
+ * @param type 出力する文字
+ */
 void dump(char type) {
   putchar(type);
 }
 
+/**
+ * @brief errno に応じて、読めないディレクトリの名前に付ける書式を返す。
+ * @return printf の書式(種類の文字と名前を受け取る)
+ */
 const char *get_error() {
   switch(errno) {
     case EACCES:
@@ -97,6 +136,13 @@ const char *get_error() {
   }
 }
 
+/**
+ * @brief 読めない項目を、名前に理由を付けて出力する。
+ * @param type 種類の文字(`D` など)
+ * @param path 項目のパス
+ * @param sizeInBlocks ブロック数
+ * @param sizeInBytes バイト数
+ */
 void dump_error(char type, const char *path,
     long long sizeInBlocks, long long sizeInBytes) {
   printf(get_error(), type, getName(path));
@@ -107,6 +153,12 @@ void dump_error(char type, const char *path,
   putchar(sep);
 }
 
+/**
+ * @brief stat の結果から項目を作る。
+ * @param path 項目のパス
+ * @param stbuf stat の結果
+ * @return 作成した項目(呼び出し側で解放する)
+ */
 struct Entity *make_entity_internal(
     const char *path,
     struct stat *stbuf) {
@@ -118,6 +170,14 @@ struct Entity *make_entity_internal(
   return e;
 }
 
+/**
+ * @brief パスの項目を作る。数えない項目なら NULL を返す。
+ *
+ * 別のデバイス上の項目と、既に見たディレクトリやハードリンクは数えない。
+ *
+ * @param path 項目のパス
+ * @return 作成した項目。lstat に失敗したときや数えないときは NULL
+ */
 struct Entity *make_entity(const char *path) {
   struct stat stbuf;
   int res = lstat(path, &stbuf);
@@ -133,6 +193,12 @@ struct Entity *make_entity(const char *path) {
   return make_entity_internal(path, &stbuf);
 }
 
+/**
+ * @brief ディレクトリのパスと名前をつないだパスを作る。
+ * @param base ディレクトリのパス
+ * @param name 名前
+ * @return 新しいパス(呼び出し側で解放する)
+ */
 char *makePath(const char *base, const char *name) {
   int baseLen = strlen(base);
   int nameLen = strlen(name);
@@ -144,6 +210,15 @@ char *makePath(const char *base, const char *name) {
   return res;
 }
 
+/**
+ * @brief ディレクトリを出力し、その中を再帰的に走査する。
+ *
+ * ファイルはすぐに出力し、サブディレクトリはディレクトリを閉じてから順に走査する
+ * (開いたままのディレクトリの数を抑えるため)。最後に `Z` を出力する。
+ *
+ * @param path ディレクトリのパス
+ * @param dirEntity ディレクトリの項目(開けなければ理由付きの名前で出力する)
+ */
 void scan_dir(const char *path, struct Entity *dirEntity) {
   DIR *dir = opendir(path);
   struct Entity *e;
@@ -197,6 +272,10 @@ void scan_dir(const char *path, struct Entity *dirEntity) {
   dump('Z');
 }
 
+/**
+ * @brief ルートのディレクトリを走査する。
+ * @param path ルートのパス(このデバイス上の項目だけを数える)
+ */
 void scan_tree(const char *path) {
   struct stat stbuf;
   int res = lstat(path, &stbuf);
@@ -210,6 +289,12 @@ void scan_tree(const char *path) {
   scan_dir(path, make_entity_internal(path, &stbuf));
 }
 
+/**
+ * @brief エントリポイント。開始の 0 バイトを出力してから走査する。
+ * @param argc 引数の数
+ * @param argv argv[1] にスキャンするディレクトリの絶対パス
+ * @return 終了コード
+ */
 int main(int argc, char **argv) {
   if (argv[1] == 0) {
     printf("Need directory argument\n");

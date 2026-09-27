@@ -1,3 +1,7 @@
+/**
+ * @file WindowInsets.kt
+ * @brief edge-to-edge 表示でシステムバーを避けるための拡張関数。
+ */
 package com.google.android.diskusage.utils
 
 import android.app.Activity
@@ -5,8 +9,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 /**
- * Since targetSdk 35 the window is always laid out edge-to-edge, and the content
- * is drawn below the system bars. Keeps the content out of them.
+ * @brief コンテンツがシステムバーやディスプレイカットアウトに重ならないように余白を付ける。
+ *
+ * targetSdk 35 以降はウィンドウが常に edge-to-edge で配置され、
+ * コンテンツがシステムバーの下にも描画されるため、その分の余白をコンテンツに設定する。
  */
 fun Activity.applySystemBarsPadding() {
     ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->

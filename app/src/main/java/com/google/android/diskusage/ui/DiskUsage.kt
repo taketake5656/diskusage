@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file DiskUsage.kt
+ * @brief ストレージの使用状況を表示するメイン画面。
+ */
 package com.google.android.diskusage.ui
 
 import android.app.ActivityManager
@@ -65,21 +69,33 @@ import java.io.IOException
 import splitties.toast.toast
 import timber.log.Timber
 
+/**
+ * @brief ストレージの使用状況をツリーで表示するメイン画面。
+ *
+ * ストレージをスキャンし(アプリの容量も含めることがある)、ツリーの表示、ファイルを開く、
+ * 削除、再スキャンを行う。対象のストレージは Intent の KEY_KEY で受け取る。
+ */
 class DiskUsage : LoadableActivity() {
+    /** @brief ツリーの表示状態(読み込みが終わるまでは null)。 */
     // FIXME: wrap to direct requests to rendering thread
     var fileSystemState: FileSystemState? = null
         private set
 
     private lateinit var mountKey: String
+    /** @brief 表示しているストレージの識別子。 */
     override val key: String
         get() = mountKey
 
+    /** @brief 確認画面で削除が承認された項目のパス(読み込み後に削除する)。 */
     private var pathToDelete: String? = null
 
+    /** @brief ツールバーのメニュー。 */
     val menu = DiskUsageMenu(this)
     private val viewModel: DiskUsageViewModel by viewModels()
+    /** @brief 読み込みが終わったら実行する処理(表示状態の復元など)。 */
     private val afterLoadActions = mutableListOf<Runnable>()
 
+    /** @brief 削除の確認画面を開き、承認されたら削除するパスを覚える。 */
     private val deleteConfirmation =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_DELETE_CONFIRMED) {
@@ -87,6 +103,11 @@ class DiskUsage : LoadableActivity() {
             }
         }
 
+    /**
+     * @brief 対象のストレージを取り出し、受け取った表示状態を復元する準備をする。
+     *
+     * ストレージが見つからなければ画面を閉じる。
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Timber.d("DiskUsage.onCreate()")
@@ -110,12 +131,22 @@ class DiskUsage : LoadableActivity() {
         if (receivedState != null) onRestoreInstanceState(receivedState)
     }
 
+    /**
+     * @brief 検索で絞り込んだツリーに表示を切り替える(カーソルはなるべく保つ)。
+     * @param newRoot 新しいツリー(null なら何もしない)
+     */
     fun applyPatternNewRoot(newRoot: FileSystemSuperRoot?) {
         if (newRoot != null) {
             fileSystemState?.replaceRootKeepCursor(newRoot)
         }
     }
 
+    /**
+     * @brief ツリーを読み込んで表示する。
+     *
+     * アプリの詳細設定から戻ったときは、アンインストールされたアプリをツリーから除く。
+     * 読み込み後に、保留していた表示状態の復元と削除を行う。
+     */
     override fun onResume() {
         super.onResume()
         pkgRemoved?.let { pkg ->
@@ -142,6 +173,11 @@ class DiskUsage : LoadableActivity() {
         }, false)
     }
 
+    /**
+     * @brief アプリがインストールされているかを調べる。
+     * @param pkg パッケージ名
+     * @return インストールされていれば true
+     */
     private fun isPackageInstalled(pkg: String): Boolean = try {
         packageManager.getPackageInfo(pkg, 0)
         true
@@ -149,6 +185,7 @@ class DiskUsage : LoadableActivity() {
         false
     }
 
+    /** @brief 表示状態を保存し、次の読み込み後に復元するようにする。 */
     override fun onPause() {
         super.onPause()
         fileSystemState?.let { state ->
@@ -158,11 +195,16 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    /** @brief ツールバーのメニューを作る。 */
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         this.menu.setupToolbarMenu(menu)
         return true
     }
 
+    /**
+     * @brief アプリの詳細設定を開く(戻ったときにアンインストールされたかを確認する)。
+     * @param pkg アプリの項目
+     */
     private fun viewPackage(pkg: FileSystemPackage) {
         Timber.d("Show package = %s", pkg.pkg)
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${pkg.pkg}".toUri()))
@@ -170,6 +212,10 @@ class DiskUsage : LoadableActivity() {
         pkgRemoved = pkg
     }
 
+    /**
+     * @brief 確認画面で承認された項目を削除する。
+     * @param path ルートからの相対パス
+     */
     private fun continueDelete(path: String) {
         val entry = fileSystemState?.masterRoot?.getEntryByName(path, true)
         if (entry != null) {
@@ -179,6 +225,14 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    /**
+     * @brief 削除してよいかを確認してから削除する。
+     *
+     * 中身のあるディレクトリは確認画面(DeleteActivity)で中のファイルを見せ、
+     * それ以外はダイアログで確認する。まとめた項目は削除できない。
+     *
+     * @param entry 削除する項目
+     */
     fun askForDeletion(entry: FileSystemEntry) {
         val path = entry.path2()
         val fullPath = entry.absolutePath()
@@ -217,6 +271,11 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    /**
+     * @brief 画面を開く。
+     * @param intent 開く Intent
+     * @return 開けたら true、対応するアプリがなければ false
+     */
     private fun tryStartActivity(intent: Intent): Boolean = try {
         startActivity(intent)
         true
@@ -224,6 +283,14 @@ class DiskUsage : LoadableActivity() {
         false
     }
 
+    /**
+     * @brief 項目を他のアプリで開く。
+     *
+     * アプリ(とその中の項目)は詳細設定を、ディレクトリはファイルマネージャーを、
+     * ファイルは拡張子の MIME タイプに対応するアプリを開く。まとめた項目は親を開く。
+     *
+     * @param selected 開く項目
+     */
     fun view(selected: FileSystemEntry) {
         val entry = if (selected is FileSystemEntrySmall) selected.parent!! else selected
         if (entry is FileSystemPackage) {
@@ -284,12 +351,18 @@ class DiskUsage : LoadableActivity() {
         toast(R.string.no_viewer_found)
     }
 
+    /** @brief ストレージをスキャンし直し、新しいツリーに切り替える。 */
     fun rescan() {
         loadFiles({ newRoot, isCached ->
             fileSystemState?.startZoomAnimation(newRoot, !isCached)
         }, true)
     }
 
+    /**
+     * @brief 「戻る」で画面を閉じる。検索中なら先に検索を閉じる。
+     *
+     * 表示状態を結果として返し、選択画面から次に開いたときに復元できるようにする。
+     */
     fun finishOnBack() {
         if (!menu.readyToFinish()) {
             return
@@ -300,11 +373,16 @@ class DiskUsage : LoadableActivity() {
         finish()
     }
 
+    /**
+     * @brief 選択中の項目が変わったときに、メニューとタイトルを更新する。
+     * @param position 選択中の項目
+     */
     fun setSelectedEntity(position: FileSystemEntry) {
         menu.update(position)
         title = getString(R.string.title_for_path, position.toTitleString())
     }
 
+    /** @brief ツールバーの「上へ」で画面を閉じる。 */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finishOnBack()
@@ -312,6 +390,7 @@ class DiskUsage : LoadableActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    /** @brief 表示状態と検索語を保存する。 */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         val state = fileSystemState ?: return
@@ -319,6 +398,7 @@ class DiskUsage : LoadableActivity() {
         menu.onSaveInstanceState(outState)
     }
 
+    /** @brief 表示状態(まだ読み込み中なら読み込み後に)と検索語を復元する。 */
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         Timber.d("DiskUsage.onRestoreInstanceState(), rootPath = %s",
             savedInstanceState.getString(KEY_KEY))
@@ -333,6 +413,7 @@ class DiskUsage : LoadableActivity() {
         menu.onRestoreInstanceState(savedInstanceState)
     }
 
+    /** @brief 1 つのストレージのツリーに使ってよいヒープの量(バイト)。ストレージの数で分け合う。 */
     private val memoryQuota: Int
         get() {
             val totalMem = getSystemService<ActivityManager>()!!.memoryClass * 1024 * 1024
@@ -340,7 +421,14 @@ class DiskUsage : LoadableActivity() {
             return totalMem / (numMountPoints + 1)
         }
 
-    /** Periodically updates the progress dialog while scanning. */
+    /**
+     * @brief スキャンを実行し、その間 50 ms ごとに進捗ダイアログを更新する。
+     * @param scanner 進捗を知らせるスキャナ
+     * @param blocksToScan スキャンで見つかる見込みのブロック数(進捗の母数)
+     * @param phaseEnd この段階が進捗バーのどこまでを使うか(0.0〜1.0)
+     * @param scan スキャンの処理
+     * @return スキャンの結果
+     */
     private inline fun <T> withProgress(
         scanner: ProgressGenerator,
         blocksToScan: Long,
@@ -375,6 +463,7 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    /** @brief 小さなファイルをまとめた項目の名前(表示言語の文字列)。 */
     private val smallEntryName = SmallEntryName { numDirs, numFiles ->
         when {
             numDirs == 0 -> getString(R.string.small_files, numFiles)
@@ -384,8 +473,14 @@ class DiskUsage : LoadableActivity() {
     }
 
     /**
-     * Blocks the file scan is expected to find. The used blocks of the file system
-     * are too many for the internal storage, which is only a part of /data.
+     * @brief ファイルのスキャンで見つかる見込みのブロック数を返す。
+     *
+     * 内部共有ストレージは /data の一部でしかないので、ファイルシステムの使用済みブロック数では
+     * 多すぎる。そこで StorageStatsManager の外部ストレージの容量を使う。
+     *
+     * @param mountPoint スキャンするストレージ
+     * @param stats ストレージのブロック使用量
+     * @return ブロック数
      */
     private fun estimateBlocksToScan(mountPoint: MountPoint, stats: FileSystemStats): Long {
         if (mountPoint.hasApps && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -401,6 +496,15 @@ class DiskUsage : LoadableActivity() {
         return stats.busyBlocks
     }
 
+    /**
+     * @brief ストレージをスキャンして、表示するツリーを作る(バックグラウンドのスレッドで呼ばれる)。
+     *
+     * ネイティブスキャナで失敗したら Java 版スキャナで代わりにスキャンする
+     * (root が拒否されたときはダイアログで知らせる)。アプリの容量も表示するストレージでは
+     * ファイルを「メディア」にまとめ、アプリの一覧を加える。最後にシステムの領域と空き容量を加える。
+     *
+     * @return ツリーのルート
+     */
     override fun scan(): FileSystemSuperRoot {
         val mountPoint = MountPoint.getForKey(this, key)!!
         val stats = FileSystemStats(mountPoint)
@@ -468,6 +572,11 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    /**
+     * @brief アプリの容量を読み込む(Android 8 以降)。
+     * @param blockSize 表示のブロックサイズ
+     * @return アプリの項目。読み込めなければ null
+     */
     private fun loadApps2SD(blockSize: Long): List<FileSystemPackage>? = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Apps2SDLoader(this).load(blockSize) else null
     } catch (t: Throwable) {
@@ -475,12 +584,20 @@ class DiskUsage : LoadableActivity() {
         null
     }
 
+    /**
+     * @brief アプリ専用ディレクトリの種類。
+     * @param dirs このアプリでの場所(パッケージ名を置き換えて他のアプリの場所にする)
+     * @param name アプリの項目の中での表示名
+     * @param type アプリのどの容量に含まれるか
+     */
     private class AppDir(val dirs: List<File?>, val name: String, val type: FileSystemPackage.ChildType)
 
     /**
-     * Moves the directories of the apps, which are found in the media part of
-     * the tree, into the app entries.
-     * @return apps sorted by the updated size
+     * @brief ツリーの「メディア」の中にあるアプリ専用ディレクトリを、アプリの項目の中に移す。
+     * @param apps アプリの項目
+     * @param media メディアの項目
+     * @param blockSize 表示のブロックサイズ
+     * @return 移した後のサイズで並べ替えたアプリの項目
      */
     private fun moveAppData(
         apps: List<FileSystemPackage>, media: FileSystemRoot, blockSize: Long,
@@ -512,6 +629,15 @@ class DiskUsage : LoadableActivity() {
         return apps.sortedWith(FileSystemEntry.COMPARE)
     }
 
+    /**
+     * @brief パスの項目をツリーから取り除き、アプリの項目の子にする。
+     * @param pkg アプリの項目
+     * @param root 探すツリー
+     * @param path 移すディレクトリの絶対パス(ツリーになければ何もしない)
+     * @param newName アプリの項目の中での表示名
+     * @param type アプリのどの容量に含まれるか
+     * @param blockSize 表示のブロックサイズ
+     */
     private fun moveIntoPackage(
         pkg: FileSystemPackage, root: FileSystemRoot, path: String, newName: String,
         type: FileSystemPackage.ChildType, blockSize: Long,
@@ -523,25 +649,33 @@ class DiskUsage : LoadableActivity() {
         pkg.addPublicChild(newRoot, type, blockSize)
     }
 
+    /** @brief 検索キーが押されたときの処理をメニューに渡す。 */
     fun searchRequest() {
         menu.searchRequest()
     }
 
     companion object {
+        /** @brief 削除の確認画面の結果: 削除する。 */
         const val RESULT_DELETE_CONFIRMED = 10
+        /** @brief 削除の確認画面の結果: 取り消し。 */
         const val RESULT_DELETE_CANCELED = 11
 
+        /** @brief Intent の extra: 表示状態の Bundle。 */
         const val STATE_KEY = "state"
+        /** @brief Intent の extra: ストレージの識別子(MountPoint.key)。 */
         const val KEY_KEY = "key"
 
         /**
-         * Part of the progress bar for the files, when the apps are loaded after them.
-         * Loading the apps takes longer: 12 s for 731 apps against 1.6 s for 23 GiB of
-         * files on a POCO F6 with cold caches.
+         * @brief アプリも読み込むときに、ファイルのスキャンが進捗バーで受け持つ割合。
+         *
+         * アプリの読み込みの方が時間がかかる。POCO F6 でキャッシュのない状態で、
+         * 731 個のアプリに 12 秒、23 GiB のファイルに 1.6 秒だった。
          */
         private const val FILES_PHASE_WITH_APPS = 0.25
 
+        /** @brief Intent の extra: 削除する項目のルートからの相対パス。 */
         const val DELETE_PATH_KEY = "path"
+        /** @brief Intent の extra: 削除する項目の絶対パス。 */
         const val DELETE_ABSOLUTE_PATH_KEY = "absolute_path"
     }
 }

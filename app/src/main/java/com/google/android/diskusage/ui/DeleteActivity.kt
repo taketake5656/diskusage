@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file DeleteActivity.kt
+ * @brief 削除の確認画面。
+ */
 package com.google.android.diskusage.ui
 
 import android.content.Intent
@@ -38,9 +42,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-/** Asks for confirmation to delete a directory, showing the files inside. */
+/**
+ * @brief ディレクトリの中のファイルを一覧表示し、削除してよいか確認する画面。
+ *
+ * 結果は DiskUsage.RESULT_DELETE_CONFIRMED(削除するパス付き)または
+ * DiskUsage.RESULT_DELETE_CANCELED で返す。
+ */
 class DeleteActivity : ComponentActivity() {
 
+    /**
+     * @brief 件数と合計サイズを表示し、ファイル一覧をバックグラウンドで読み込む。
+     * @param savedInstanceState 保存された状態
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileSystemEntry.setupStrings(this)
@@ -65,6 +78,11 @@ class DeleteActivity : ComponentActivity() {
         setResult(DiskUsage.RESULT_DELETE_CANCELED)
     }
 
+    /**
+     * @brief ディレクトリ以下のファイルとディレクトリを列挙する。
+     * @param root 削除するディレクトリ
+     * @return 一覧の行(ディレクトリはサイズが空)
+     */
     private fun listFiles(root: File): List<FileInfo> =
         root.walkTopDown().mapNotNull { file ->
             when {
@@ -74,11 +92,17 @@ class DeleteActivity : ComponentActivity() {
             }
         }.toList()
 
+    /** @brief 「キャンセル」と「削除」のメニューを表示する。 */
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.ask_for_delete_menu, menu)
         return super.onCreateOptionsMenu(menu)
     }
 
+    /**
+     * @brief 選んだメニューに応じて結果を設定し、画面を閉じる。
+     * @param item 選ばれたメニュー項目
+     * @return 処理したら true
+     */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.ask_cancel -> setResult(DiskUsage.RESULT_DELETE_CANCELED)
@@ -94,7 +118,9 @@ class DeleteActivity : ComponentActivity() {
     }
 
     companion object {
+        /** @brief Intent の extra: 削除するファイルの数。 */
         const val NUM_FILES_KEY = "numFiles"
+        /** @brief Intent の extra: 削除する容量の表示文字列。 */
         const val SIZE_KEY = "size"
     }
 }

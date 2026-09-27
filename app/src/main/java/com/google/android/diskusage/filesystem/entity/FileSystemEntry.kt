@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file FileSystemEntry.kt
+ * @brief ファイルシステムのツリーの項目と、その描画。
+ */
 package com.google.android.diskusage.filesystem.entity
 
 import android.content.Context
@@ -28,10 +32,25 @@ import com.google.android.diskusage.ui.Cursor
 import com.google.android.diskusage.ui.TreeSkin
 import timber.log.Timber
 
+/**
+ * @brief ファイルシステムのツリーの項目(ディレクトリ、または派生クラスでファイルなど)。
+ *
+ * 子はサイズの大きい順に並べる。サイズはブロック数と表示用のバイト数を 1 つの Long に
+ * 詰めて持つ(encodedSize)。ツリー全体の描画もこのクラスで行う。
+ *
+ * @param parent 親の項目(ルートなら null)
+ * @param name 名前
+ */
 open class FileSystemEntry protected constructor(
     var parent: FileSystemEntry?,
     var name: String,
 ) {
+    /**
+     * @brief サイズ。そのまま描画と並べ替えに使える形にしてある。
+     *
+     * 上位 40 ビットがブロック数、下位 24 ビットが表示用のサイズ(単位の種類と、その単位での値)。
+     * 詳しい形式は下のコメントを参照。
+     */
     // The size suitable for painting without any operations (and sorting)
     // Bit layout:
     // 40 bits      | 24 bits
@@ -58,20 +77,24 @@ open class FileSystemEntry protected constructor(
     // 4: sz >= 1024 * 1024 * 200: "%4.0f MiB", sz * (1f / 1024 / 1024)
     var encodedSize: Long = 0
 
+    /** @brief 子の項目(サイズの大きい順)。ファイルなら null。 */
     var children: Array<FileSystemEntry>? = null
 
     private var cachedSizeString: String? = null
 
+    /** @brief サイズ(ブロック数)。 */
     val sizeInBlocks: Long
         get() = encodedSize shr BLOCK_OFFSET
 
+    /** @brief 描画に使うサイズ(ブロック数を上位ビットに置いた値。表示用の下位ビットは除く)。 */
     val sizeForRendering: Long
         get() = encodedSize and BLOCK_MASK.inv()
 
+    /** @brief 削除できるかどうか。 */
     open val isDeletable: Boolean
         get() = false
 
-    /** Number of files, not directories. */
+    /** @brief 含まれるファイルの数(ディレクトリは数えない)。 */
     open val numFiles: Int
         get() {
             val children = children ?: return 1
@@ -79,29 +102,60 @@ open class FileSystemEntry protected constructor(
             return children.sumOf { it.numFiles } + if (hasFile) 1 else 0
         }
 
+    /**
+     * @brief サイズの表示文字列を返す。
+     * @return 「1.23 MiB」などの文字列
+     */
     fun sizeString(): String = calcSizeStringFromEncoded(encodedSize)
 
-    /** Size string, cached for painting. */
+    /**
+     * @brief サイズの表示文字列を返す(描画用にキャッシュする)。
+     * @return サイズの表示文字列
+     */
     private fun cachedSizeString(): String =
         cachedSizeString ?: sizeString().also { cachedSizeString = it }
 
+    /** @brief サイズの表示文字列のキャッシュを捨てる(サイズを変えたときに呼ぶ)。 */
     fun clearSizeStringCache() {
         cachedSizeString = null
     }
 
+    /**
+     * @brief サイズをブロック数で設定する。
+     * @param blocks ブロック数
+     * @param blockSize ブロックサイズ(バイト)
+     */
     fun setSizeInBlocks(blocks: Long, blockSize: Long) {
         encodedSize = (blocks shl BLOCK_OFFSET) or makeBytesPart(blocks * blockSize)
     }
 
+    /**
+     * @brief サイズをバイト数で設定する(ブロック数は切り上げ)。
+     * @param bytes バイト数
+     * @param blockSize ブロックサイズ(バイト)
+     * @return この項目
+     */
     fun initSizeInBytes(bytes: Long, blockSize: Long): FileSystemEntry = apply {
         val blocks = (bytes + blockSize - 1) / blockSize
         encodedSize = (blocks shl BLOCK_OFFSET) or makeBytesPart(bytes)
     }
 
+    /**
+     * @brief サイズをバイト数とブロック数で設定する。
+     * @param bytes 表示するバイト数
+     * @param blocks ブロック数
+     * @return この項目
+     */
     fun initSizeInBytesAndBlocks(bytes: Long, blocks: Long): FileSystemEntry = apply {
         encodedSize = (blocks shl BLOCK_OFFSET) or makeBytesPart(bytes)
     }
 
+    /**
+     * @brief 子を設定し、サイズを子の合計にする。
+     * @param children 子(並べ替え済みのもの)。null ならファイルとして扱う
+     * @param blockSize ブロックサイズ(バイト)
+     * @return この項目
+     */
     fun setChildren(children: Array<FileSystemEntry>?, blockSize: Long): FileSystemEntry = apply {
         this.children = children
         if (children == null) return@apply
@@ -109,10 +163,20 @@ open class FileSystemEntry protected constructor(
         setSizeInBlocks(children.sumOf { it.sizeInBlocks }, blockSize)
     }
 
+    /**
+     * @brief 同じ種類・名前の空の項目を作る(コピー用。派生クラスで上書きする)。
+     * @return 親と子を持たない新しい項目
+     */
     open fun create(): FileSystemEntry = FileSystemEntry(null, name)
 
+    /** @brief 検索のスレッドが割り込まれたときに投げる例外。 */
     class SearchInterruptedException : RuntimeException()
 
+    /**
+     * @brief 子孫も含めて項目をコピーする。
+     * @return コピー
+     * @throws SearchInterruptedException スレッドが割り込まれたとき
+     */
     fun copy(): FileSystemEntry {
         if (Thread.interrupted()) throw SearchInterruptedException()
         val copy = create()
@@ -121,6 +185,12 @@ open class FileSystemEntry protected constructor(
         return copy
     }
 
+    /**
+     * @brief 子を検索語で絞り込んだコピーを作る。
+     * @param pattern 検索語(小文字)
+     * @param blockSize ブロックサイズ(バイト)
+     * @return 一致した子だけを持つコピー。一致がなければ null
+     */
     fun filterChildren(pattern: CharSequence, blockSize: Long): FileSystemEntry? {
         val children = children ?: return null
         val filtered = children.mapNotNull { it.filter(pattern, blockSize) }.toTypedArray()
@@ -129,6 +199,12 @@ open class FileSystemEntry protected constructor(
         return create().setChildren(filtered, blockSize)
     }
 
+    /**
+     * @brief 検索語で絞り込んだコピーを作る。名前が一致すれば中身ごと残す。
+     * @param pattern 検索語(小文字)
+     * @param blockSize ブロックサイズ(バイト)
+     * @return 絞り込んだコピー。一致がなければ null
+     */
     open fun filter(pattern: CharSequence, blockSize: Long): FileSystemEntry? {
         if (name.lowercase().contains(pattern)) {
             return copy()
@@ -137,8 +213,10 @@ open class FileSystemEntry protected constructor(
     }
 
     /**
-     * Find index of directChild in 'children' field of this entry.
-     * @return index of the directChild in 'children' field.
+     * @brief 直接の子が children の何番目かを返す。
+     * @param directChild 直接の子
+     * @return children の中の位置
+     * @throws IllegalStateException 子でないとき
      */
     fun getIndexOf(directChild: FileSystemEntry): Int {
         val index = children?.indexOfFirst { it === directChild } ?: -1
@@ -146,26 +224,32 @@ open class FileSystemEntry protected constructor(
         return index
     }
 
-    /**
-     * Find entry which follows this entry in its the parent.
-     * @return next entry in the same parent or this entry if there is no more entries
-     */
+    /** @brief 同じ親の中で次の項目。最後ならこの項目自身。 */
     val next: FileSystemEntry
         get() {
             val siblings = parent!!.children!!
             return siblings.getOrNull(parent!!.getIndexOf(this) + 1) ?: this
         }
 
-    /**
-     * Find entry which precedes this entry in its the parent.
-     * @return previous entry in the same parent or this entry if the entry is first
-     */
+    /** @brief 同じ親の中で前の項目。先頭ならこの項目自身。 */
     val prev: FileSystemEntry
         get() {
             val siblings = parent!!.children!!
             return siblings.getOrNull(parent!!.getIndexOf(this) - 1) ?: this
         }
 
+    /**
+     * @brief この項目をルートとしてツリーを描画する(項目、特別な項目、カーソル)。
+     * @param canvas 描画先
+     * @param skin 見た目
+     * @param bounds 描画する範囲(画面座標)
+     * @param cursor カーソル
+     * @param viewTop 表示範囲の上端(描画単位)
+     * @param viewDepth 表示範囲の左端の深さ
+     * @param yscale 描画単位から画面座標への縦の倍率
+     * @param screenHeight 画面の高さ
+     * @param numSpecialEntries 末尾にある特別な項目(空き容量など)の数
+     */
     fun paint(
         canvas: Canvas, skin: TreeSkin, bounds: Rect, cursor: Cursor, viewTop: Long,
         viewDepth: Float, yscale: Float, screenHeight: Int, numSpecialEntries: Int,
@@ -186,14 +270,18 @@ open class FileSystemEntry protected constructor(
     }
 
     /**
-     * Converts the screen clip area to world coordinates.
+     * @brief 画面の描画範囲を、ツリーの座標(ワールド座標)に変換したもの。
      *
-     * Scale conversion: window_y = yscale * world_y.
-     * Offset conversion: window_y = yscale * (world_y - rootOffset).
+     * 倍率の変換: 画面の y = yscale * ワールドの y。
+     * 位置の変換: 画面の y = yscale * (ワールドの y - ルートの位置)。
      *
-     * X coords: xoffset is the screen position of current object, clip is in
-     * coords of the current object. Y coords: yoffset is the screen position of
-     * current object, clip is in world coords relative to current object.
+     * x 座標: xoffset は現在の項目の画面上の位置で、範囲は現在の項目の座標。
+     * y 座標: yoffset は現在の項目の画面上の位置で、範囲は現在の項目からのワールド座標。
+     *
+     * @param bounds 描画する範囲(画面座標)
+     * @param viewTop 表示範囲の上端(描画単位)
+     * @param viewDepth 表示範囲の左端の深さ
+     * @param yscale 縦の倍率
      */
     private class ViewClip(bounds: Rect, viewTop: Long, viewDepth: Float, yscale: Float) {
         private val viewLeft = (viewDepth * elementWidth).toInt()
@@ -204,6 +292,10 @@ open class FileSystemEntry protected constructor(
         val yoffset = -viewTop * yscale
     }
 
+    /**
+     * @brief タイトルバーに出す文字列(名前、サイズ、子の数)を返す。
+     * @return タイトルの文字列
+     */
     fun toTitleString(): String {
         val sizeString = sizeString()
         val children = children
@@ -214,7 +306,10 @@ open class FileSystemEntry protected constructor(
         }
     }
 
-    /** Path relative to the mount point, without the two top level entries. */
+    /**
+     * @brief マウントポイントからの相対パスを返す(最上位の 2 つの項目は含めない)。
+     * @return `/` 区切りのパス
+     */
     fun path2(): String =
         generateSequence(this) { it.parent }
             .map { it.name }
@@ -223,6 +318,10 @@ open class FileSystemEntry protected constructor(
             .asReversed()
             .joinToString("/")
 
+    /**
+     * @brief 絶対パスを返す(最も近い FileSystemRoot のパスを起点にする)。
+     * @return 絶対パス
+     */
     fun absolutePath(): String {
         if (this is FileSystemRoot) {
             return rootPath
@@ -231,16 +330,18 @@ open class FileSystemEntry protected constructor(
     }
 
     /**
-     * Find depth of 'entry' in current element.
-     * @return 1 for depth equal 1 and so on
+     * @brief この項目から見た entry の深さを返す。
+     * @param entry 子孫の項目
+     * @return 直接の子なら 1、孫なら 2、…
      */
     fun depth(entry: FileSystemEntry): Int =
         generateSequence(entry) { it.parent }.takeWhile { it !== this }.count()
 
     /**
-     * Find and return entry on specified depth and offset in this entry used as root.
-     * @param maxDepth maximum depth to find entry
-     * @return nearest entry to the specified conditions
+     * @brief この項目をルートとして、指定した深さと位置にある項目を探す。
+     * @param maxDepth 探す最大の深さ
+     * @param offset ルートの先頭からの位置(描画単位)
+     * @return 条件に最も近い項目
      */
     fun findEntry(maxDepth: Int, offset: Long): FileSystemEntry {
         var currOffset = 0L
@@ -263,8 +364,9 @@ open class FileSystemEntry protected constructor(
     }
 
     /**
-     * Returns offset in bytes (world coordinates) from start of this
-     * object to the start of 'cursor' object.
+     * @brief この項目の先頭から cursor の項目の先頭までの位置(描画単位のワールド座標)を返す。
+     * @param cursor 子孫の項目
+     * @return 位置
      */
     fun getOffset(cursor: FileSystemEntry): Long {
         var offset = 0L
@@ -279,6 +381,10 @@ open class FileSystemEntry protected constructor(
         return offset
     }
 
+    /**
+     * @brief この項目を親から取り除き、祖先のサイズを減らして並べ直す。
+     * @param blockSize ブロックサイズ(バイト)
+     */
     // FIXME: no resort needed
     fun remove(blockSize: Long) {
         val parent = parent!!
@@ -297,6 +403,11 @@ open class FileSystemEntry protected constructor(
         }
     }
 
+    /**
+     * @brief 子を追加し、自身と祖先のサイズを増やす。
+     * @param newEntry 追加する項目
+     * @param blockSize ブロックサイズ(バイト)
+     */
     fun insert(newEntry: FileSystemEntry, blockSize: Long) {
         val children = children!! + newEntry
         children.sortWith(COMPARE)
@@ -312,7 +423,10 @@ open class FileSystemEntry protected constructor(
     }
 
     /**
-     * Walks through the path and finds the specified entry, null otherwise.
+     * @brief パスをたどって項目を探す。
+     * @param path この項目からの相対パス
+     * @param exactMatch 完全一致で探すかどうか(現在はどちらでも完全一致で探す)
+     * @return 見つかった項目。なければ null
      */
     open fun getEntryByName(path: String, exactMatch: Boolean): FileSystemEntry? {
         Timber.d("getEntryByName: getEntryForName = %s", path)
@@ -326,19 +440,22 @@ open class FileSystemEntry protected constructor(
     }
 
     companion object {
+        /** @brief 文字のアセント(ベースラインから上端まで、負の値)。 */
         var ascent = 0f
             private set
 
+        /** @brief 文字のディセント(ベースラインから下端まで)。 */
         var descent = 0f
             private set
 
-        /** Font size. Also accessed from FileSystemView. */
+        /** @brief 文字の高さ。FileSystemState からも使う。 */
         var fontSize = 0f
             private set
 
-        /** Width of one element. Setup from FileSystemView when geometry changes. */
+        /** @brief 1 階層分の項目の幅。画面の大きさが変わったときに FileSystemState が設定する。 */
         var elementWidth = 0
 
+        /** @brief 削除のアニメーション中の項目(小さくても縞にせずに描く)。 */
         var deletedEntry: FileSystemEntry? = null
 
         private lateinit var nBytes: String
@@ -368,6 +485,7 @@ open class FileSystemEntry protected constructor(
         // will take for a while to make this break
         // 16Mb block size on mobile device... probably in year 2020.
         // probably 32 bits for maximum number of block will break before ~2016
+        /** @brief encodedSize の中のブロック数の位置(ビット)。 */
         const val BLOCK_OFFSET = 24
         private const val BLOCK_MASK = (1L shl BLOCK_OFFSET) - 1
 
@@ -375,12 +493,23 @@ open class FileSystemEntry protected constructor(
         private const val MB = 1024L * KB
         private const val GB = 1024L * MB
 
-        /** For sorting according to size, largest first. */
+        /** @brief サイズの大きい順に並べるための比較。 */
         val COMPARE: Comparator<FileSystemEntry> =
             Comparator { a, b -> b.encodedSize.compareTo(a.encodedSize) }
 
+        /**
+         * @brief ディレクトリの項目を作る。
+         * @param parent 親の項目
+         * @param name 名前
+         * @return 作成した項目
+         */
         fun makeNode(parent: FileSystemEntry?, name: String) = FileSystemEntry(parent, name)
 
+        /**
+         * @brief バイト数を encodedSize の下位ビット(単位の種類と、その単位での値)にする。
+         * @param size バイト数
+         * @return 下位ビットの値
+         */
         private fun makeBytesPart(size: Long): Long = when {
             size < KB -> size
             size < MB -> MULTIPLIER_KBYTES or (size shr 10)
@@ -392,8 +521,14 @@ open class FileSystemEntry protected constructor(
             else -> MULTIPLIER_GBYTES100 or (size shr 30)
         }
 
+        /** @brief Int と Long のビット和。 */
         private infix fun Int.or(other: Long): Long = toLong() or other
 
+        /**
+         * @brief encodedSize からサイズの表示文字列を作る。
+         * @param encodedSize 項目のサイズ
+         * @return 「1.23 MiB」などの文字列
+         */
         fun calcSizeStringFromEncoded(encodedSize: Long): String {
             val size = SIZE_MASK and encodedSize.toInt()
             return when (MULTIPLIER_MASK and encodedSize.toInt()) {
@@ -410,12 +545,12 @@ open class FileSystemEntry protected constructor(
         }
 
         /**
-         * Calculate size string for specified file length in bytes.
+         * @brief バイト数からサイズの表示文字列を作る。
          *
-         * Currently used by delete activity preview file list loader.
+         * 削除の確認画面のファイル一覧などで使う。
          *
-         * @param size file size in bytes
-         * @return formated size string
+         * @param size バイト数
+         * @return 表示文字列
          */
         fun calcSizeString(size: Long): String {
             val sz = size.coerceAtLeast(0).toFloat()
@@ -428,6 +563,10 @@ open class FileSystemEntry protected constructor(
             }
         }
 
+        /**
+         * @brief サイズとタイトルの書式をリソースから読み込む(初回だけ)。
+         * @param context Context
+         */
         fun setupStrings(context: Context) {
             if (::nBytes.isInitialized) return
             nBytes = context.getString(R.string.n_bytes)
@@ -443,7 +582,10 @@ open class FileSystemEntry protected constructor(
             dirNameSize = context.getString(R.string.dir_name_size)
         }
 
-        /** Updates the font metrics used for the layout of labels. */
+        /**
+         * @brief ラベルの配置に使う文字の寸法を更新する。
+         * @param textPaint 文字の描画設定
+         */
         fun updateFonts(textPaint: Paint) {
             ascent = textPaint.ascent()
             descent = textPaint.descent()
@@ -451,8 +593,14 @@ open class FileSystemEntry protected constructor(
         }
 
         /**
-         * Vertical position of the label center: in the middle of the entry, but
-         * kept on the screen when the entry is partially visible.
+         * @brief ラベルの縦の中心を返す。
+         *
+         * 項目の中央に置くが、項目が画面から一部はみ出すときは画面内に収める。
+         *
+         * @param top 項目の上端
+         * @param bottom 項目の下端
+         * @param screenHeight 画面の高さ
+         * @return ラベルの中心の y 座標
          */
         private fun labelCenter(top: Float, bottom: Float, screenHeight: Int): Float {
             val fontSize = fontSize
@@ -465,16 +613,31 @@ open class FileSystemEntry protected constructor(
             }
         }
 
-        /** Horizontal position of labels inside an entry. */
+        /** @brief 項目の中でのラベルの横の位置。 */
         private const val LABEL_OFFSET = 6
 
+        /**
+         * @brief 項目の幅に収まるように名前を切り詰める。
+         * @param entry 項目
+         * @param paint 文字の描画設定
+         * @return 切り詰めた名前
+         */
         private fun clippedName(entry: FileSystemEntry, paint: Paint): String {
             val maxWidth = (elementWidth - LABEL_OFFSET - 3).toFloat()
             val cliplen = paint.breakText(entry.name, true, maxWidth, null)
             return entry.name.substring(0, cliplen)
         }
 
-        /** Draws the name and, if there is space, the size of the entry. */
+        /**
+         * @brief 項目の名前と、余裕があればサイズを描く。
+         * @param canvas 描画先
+         * @param skin 見た目
+         * @param entry 項目
+         * @param left 左端
+         * @param top 上端
+         * @param bottom 下端
+         * @param screenHeight 画面の高さ
+         */
         private fun drawLabel(
             canvas: Canvas, skin: TreeSkin, entry: FileSystemEntry,
             left: Float, top: Float, bottom: Float, screenHeight: Int,
@@ -490,6 +653,20 @@ open class FileSystemEntry protected constructor(
             }
         }
 
+        /**
+         * @brief 表示上のルートの末尾にある特別な項目(空き容量など)を描く。
+         * @param entries 最上位の項目(先頭が表示上のルート)
+         * @param canvas 描画先
+         * @param skin 見た目
+         * @param xoffset0 最上位の項目の画面上の x 座標
+         * @param yoffset0 最上位の項目の画面上の y 座標
+         * @param yscale 縦の倍率
+         * @param clipLeft0 描画範囲の左端
+         * @param clipTop 描画範囲の上端
+         * @param clipBottom 描画範囲の下端
+         * @param screenHeight 画面の高さ
+         * @param numSpecial 特別な項目の数
+         */
         // Copy pasted from paint() and changed to lower overhead on generic drawing code
         private fun paintSpecial(
             entries: Array<FileSystemEntry>, canvas: Canvas, skin: TreeSkin,
@@ -510,8 +687,17 @@ open class FileSystemEntry protected constructor(
         }
 
         /**
-         * Walks the special entries (free and system space) which are the last
-         * [numSpecial] children, skipping the ones outside of the clip area.
+         * @brief 末尾 numSpecial 個の特別な項目(空き容量とシステムの領域)を順にたどる。
+         *
+         * 描画範囲の外にあるものは飛ばす。
+         *
+         * @param children 子の項目
+         * @param yoffset0 先頭の子の画面上の y 座標
+         * @param yscale 縦の倍率
+         * @param clipTop 描画範囲の上端
+         * @param clipBottom 描画範囲の下端
+         * @param numSpecial 特別な項目の数
+         * @param draw 各項目を描く処理(項目、上端、下端)
          */
         private inline fun forEachSpecial(
             children: Array<FileSystemEntry>, yoffset0: Float, yscale: Float,
@@ -552,6 +738,24 @@ open class FileSystemEntry protected constructor(
             }
         }
 
+        /**
+         * @brief 項目とその子孫を再帰的に描く。
+         *
+         * 描画範囲の外は飛ばし、高さが 4 ピクセル未満になったら残りをまとめて縞で塗る。
+         *
+         * @param parentSize0 親のサイズ(描画単位)
+         * @param entries 描く項目(兄弟)
+         * @param canvas 描画先
+         * @param skin 見た目
+         * @param xoffset 項目の画面上の x 座標
+         * @param yoffset0 先頭の項目の画面上の y 座標
+         * @param yscale 縦の倍率
+         * @param clipLeft 描画範囲の左端
+         * @param clipTop 描画範囲の上端
+         * @param clipBottom 描画範囲の下端
+         * @param clipRight 描画範囲の右端(画面座標)
+         * @param screenHeight 画面の高さ
+         */
         private fun paint(
             parentSize0: Long, entries: Array<FileSystemEntry>, canvas: Canvas, skin: TreeSkin,
             xoffset: Float, yoffset0: Float, yscale: Float,

@@ -1,3 +1,7 @@
+/**
+ * @file DiskUsageMenu.kt
+ * @brief メイン画面のツールバーのメニュー(検索、表示、再スキャン、削除、このアプリについて)。
+ */
 package com.google.android.diskusage.ui
 
 import android.app.AlertDialog
@@ -29,7 +33,12 @@ import splitties.resources.styledColor
 import splitties.toast.toast
 import timber.log.Timber
 
+/**
+ * @brief メイン画面のツールバーのメニューと検索を扱う。
+ * @param diskusage メイン画面
+ */
 class DiskUsageMenu(val diskusage: DiskUsage) {
+    /** @brief 検索で絞り込む前のツリー。 */
     var masterRoot: FileSystemSuperRoot? = null
     private var searchPattern: String? = null
     private val searchManager by lazy { SearchManager(this) }
@@ -38,13 +47,20 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
     private var origSearchBackground: Drawable? = null
     private lateinit var viewModel: DiskUsageViewModel
 
+    /**
+     * @brief ボタンの状態を持つ ViewModel を受け取る。
+     * @param viewModel メイン画面の ViewModel
+     */
     fun onCreate(viewModel: DiskUsageViewModel) {
         this.viewModel = viewModel
 //        val actionBar = checkNotNull(diskusage.actionBar)
 //        actionBar.setDisplayHomeAsUpEnabled(true)
     }
 
-    /** Closes the search first, if it is open. */
+    /**
+     * @brief 画面を閉じてよいかを返す。検索欄が開いていれば、先にそれを閉じる。
+     * @return 閉じてよければ true
+     */
     fun readyToFinish(): Boolean {
         val searchView = searchView
         if (searchView == null || searchView.isIconified) return true
@@ -53,9 +69,15 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         return false
     }
 
+    /** @brief 検索キーが押されたときの処理(何もしない)。 */
     fun searchRequest() {
     }
 
+    /**
+     * @brief 検索欄のメニュー項目を追加する。入力のたびに検索し、閉じたら元のツリーに戻す。
+     * @param menu 追加先のメニュー
+     * @return 追加した項目
+     */
     private fun setupSearchMenuItem(menu: Menu): MenuItem {
         val iconTint = diskusage.styledColor(android.R.attr.colorControlNormal)
         return menu.item(
@@ -94,14 +116,27 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         }
     }
 
+    /**
+     * @brief 検索語を保存する。
+     * @param outState 保存先
+     */
     fun onSaveInstanceState(outState: Bundle) {
         outState.putString("search", searchPattern)
     }
 
+    /**
+     * @brief 検索語を復元する。
+     * @param inState 保存された状態
+     */
     fun onRestoreInstanceState(inState: Bundle) {
         searchPattern = inState.getString("search")
     }
 
+    /**
+     * @brief ツリーのビューを画面に設定し、メニューを更新する。
+     * @param view 表示するビュー
+     * @param newRoot 検索前のツリー
+     */
     fun wrapAndSetContentView(view: View?, newRoot: FileSystemSuperRoot?) {
         masterRoot = newRoot
         updateMenu()
@@ -109,6 +144,10 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         diskusage.invalidateOptionsMenu()
     }
 
+    /**
+     * @brief 検索語でツリーを絞り込む。空なら元のツリーに戻す。
+     * @param searchQuery 検索語
+     */
     fun applyPattern(searchQuery: String?) {
         if (searchQuery == null || masterRoot == null) return
 
@@ -120,6 +159,12 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         }
     }
 
+    /**
+     * @brief 検索結果を表示する。一致がなければ検索欄を赤くして元のツリーを表示する。
+     * @param newRoot 絞り込んだツリー(一致がなければ null)
+     * @param searchQuery 検索語
+     * @return 一致があれば true
+     */
     fun finishedSearch(newRoot: FileSystemSuperRoot?, searchQuery: String?): Boolean {
         return if (newRoot != null) {
             searchView?.background = origSearchBackground
@@ -132,11 +177,24 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         }
     }
 
+    /**
+     * @brief 選択中の項目が変わったときに、ボタンの状態を更新する。
+     * @param position 選択中の項目
+     */
     fun update(position: FileSystemEntry?) {
         this.selectedEntity = position
         updateMenu()
     }
 
+    /**
+     * @brief ツールバーのメニューを作る。
+     *
+     * 検索、表示、再スキャン、削除と「このアプリについて」を追加する。
+     * 「このアプリについて」はバージョンとソースコードへのリンクをダイアログで表示し、
+     * リンクをタップするとブラウザ(または GitHub アプリ)で開く。
+     *
+     * @param menu 追加先のメニュー
+     */
     fun setupToolbarMenu(menu: Menu) {
         setupSearchMenuItem(menu)
 
@@ -215,6 +273,12 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         updateMenu()
     }
 
+    /**
+     * @brief ボタンの表示と有効状態を更新する。
+     *
+     * 「表示」はルートと特別な項目以外で、「削除」はさらに削除できる項目・検索中でない
+     * (またはファイル)・削除できるストレージのときに有効にする。
+     */
     private fun updateMenu() {
         val state = diskusage.fileSystemState
         if (state == null) {
@@ -247,6 +311,7 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
     }
 
     private companion object {
+        /** @brief 「このアプリについて」に出すソースコードの URL。 */
         const val SOURCE_CODE_URL = "https://github.com/taketake5656/diskusage"
     }
 }

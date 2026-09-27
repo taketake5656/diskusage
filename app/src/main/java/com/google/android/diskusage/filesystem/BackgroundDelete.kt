@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file BackgroundDelete.kt
+ * @brief ファイルやディレクトリの削除。
+ */
 package com.google.android.diskusage.filesystem
 
 import android.widget.ProgressBar
@@ -35,12 +39,18 @@ import splitties.toast.longToast
 import splitties.toast.toast
 import timber.log.Timber
 
-/** Deletes a directory in the background, showing progress. */
+/**
+ * @brief ディレクトリを進捗ダイアログ付きでバックグラウンドで削除する。
+ * @param diskUsage メイン画面
+ * @param entry 削除する項目
+ * @param file 削除するディレクトリ
+ */
 class BackgroundDelete private constructor(
     private val diskUsage: DiskUsage,
     private val entry: FileSystemEntry,
     private val file: File,
 ) {
+    /** @brief 削除の結果。 */
     private enum class Status {
         SUCCESS,
         FAILED,
@@ -58,6 +68,7 @@ class BackgroundDelete private constructor(
     private val fileSystemState
         get() = diskUsage.fileSystemState!!
 
+    /** @brief 進捗ダイアログを表示し、削除のスレッドを開始する。 */
     private fun start() {
         val padding = diskUsage.resources.getDimensionPixelSize(R.dimen.default_app_icon_size) / 2
         dialog = AlertDialog.Builder(diskUsage)
@@ -77,6 +88,13 @@ class BackgroundDelete private constructor(
         }
     }
 
+    /**
+     * @brief 削除の完了を受け取る(メインスレッド)。
+     *
+     * ツリーから項目を取り除き、削除しきれなかったときは残った分をスキャンし直して戻す。
+     *
+     * @param status 削除の結果
+     */
     private fun onFinished(status: Status) {
         try {
             dialog?.dismiss()
@@ -90,6 +108,7 @@ class BackgroundDelete private constructor(
         notifyUser(status)
     }
 
+    /** @brief 削除しきれずに残ったディレクトリを Java 版スキャナで読み直し、ツリーに戻す。 */
     private fun restore() {
         Timber.d("restore started for %s", path)
         val mountPoint = MountPoint.getForKey(diskUsage, diskUsage.key) ?: return
@@ -107,6 +126,10 @@ class BackgroundDelete private constructor(
         }
     }
 
+    /**
+     * @brief 削除したディレクトリとファイルの数をトーストで知らせる。
+     * @param status 削除の結果
+     */
     private fun notifyUser(status: Status) {
         Timber.d("notifyUser: Delete: status = %s directories %s files %s",
             status, numDeletedDirectories, numDeletedFiles)
@@ -118,6 +141,11 @@ class BackgroundDelete private constructor(
         longToast(appStr(message, numDeletedDirectories, numDeletedFiles))
     }
 
+    /**
+     * @brief ファイルまたはディレクトリを中身ごと削除する。失敗か取り消しの時点で止める。
+     * @param file 削除する対象
+     * @return 削除の結果
+     */
     private fun deleteRecursively(file: File): Status {
         if (cancelDeletion) return Status.CANCELED
         val isDirectory = file.isDirectory
@@ -136,6 +164,15 @@ class BackgroundDelete private constructor(
     }
 
     companion object {
+        /**
+         * @brief 項目を削除する。
+         *
+         * ストレージ全体を含む削除は取り消す。ファイルはその場で削除し、
+         * ディレクトリはバックグラウンドで削除する。
+         *
+         * @param diskUsage メイン画面
+         * @param entry 削除する項目
+         */
         fun startDelete(diskUsage: DiskUsage, entry: FileSystemEntry) {
             val path = entry.path2()
             val deleteRoot = entry.absolutePath()

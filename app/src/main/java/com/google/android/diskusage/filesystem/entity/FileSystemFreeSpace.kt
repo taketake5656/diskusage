@@ -17,10 +17,21 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file FileSystemFreeSpace.kt
+ * @brief ストレージの空き容量を表す項目。
+ */
 package com.google.android.diskusage.filesystem.entity
 
+/**
+ * @brief ストレージの空き容量を表す特別な項目。
+ * @param name 表示名
+ * @param size 空き容量(バイト)
+ * @param blockSize ブロックサイズ(バイト)
+ */
 class FileSystemFreeSpace(name: String, size: Long, blockSize: Long) :
     FileSystemSpecial(name, size, blockSize) {
 
+    /** @brief 検索結果には含めない。 @return 常に null */
     override fun filter(pattern: CharSequence, blockSize: Long): FileSystemEntry? = null
 }

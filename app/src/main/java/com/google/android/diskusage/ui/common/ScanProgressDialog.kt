@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file ScanProgressDialog.kt
+ * @brief スキャンの進捗ダイアログ。
+ */
 package com.google.android.diskusage.ui.common
 
 import android.content.Context
@@ -31,7 +35,14 @@ import com.google.android.diskusage.databinding.ProgressBinding
 import com.google.android.diskusage.filesystem.entity.FileSystemEntry
 import java.text.NumberFormat
 
-/** Progress of the scan, with the path being scanned. */
+/**
+ * @brief スキャンの進捗を、パーセンテージとスキャン中のパスで表示するダイアログ。
+ *
+ * スキャンは段階(ファイル → アプリ)に分かれ、それぞれが進捗バーの一部を受け持つ。
+ * 表示する割合は段階の終わりを超えず、逆戻りもしない。
+ *
+ * @param context Context
+ */
 class ScanProgressDialog(context: Context) : AlertDialog(context) {
     private lateinit var binding: ProgressBinding
     private var details: CharSequence? = null
@@ -48,13 +59,20 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
     private var phaseEnd = 1.0
     private var shownFraction = 0.0
 
+    /**
+     * @brief 現在の段階の進捗の最大値を設定する。
+     * @param max 最大値(ブロック数やアプリの数)
+     */
     fun setMax(max: Long) {
         this.max = max
     }
 
     /**
-     * Starts the next phase, which fills the bar from where it is up to [end].
-     * The progress of the phase is counted from zero again.
+     * @brief 次の段階を始める。進捗バーの今の位置から end までをこの段階に割り当てる。
+     *
+     * 段階の進捗は 0 から数え直す。
+     *
+     * @param end 段階の終わりの割合(0.0〜1.0)
      */
     fun startPhase(end: Double) {
         phaseStart = shownFraction
@@ -62,6 +80,11 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
         progress = 0
     }
 
+    /**
+     * @brief 項目のパス(ルートの名前を除く)を作り、深さを記録する。
+     * @param entry 項目
+     * @return `/` 区切りのパス。ルート直下より浅ければ空文字列
+     */
     private fun path(entry: FileSystemEntry): String {
         val pathElements = generateSequence(entry) { it.parent }.map { it.name }.toList()
         depth = pathElements.size
@@ -69,7 +92,14 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
         return pathElements.dropLast(1).asReversed().joinToString("/")
     }
 
-    /** Shortens the path to fit the view, keeping the changed part visible. */
+    /**
+     * @brief パスを表示欄の幅に収まるように、途中を「...」で省略する。
+     *
+     * 前回のパスから変わった部分が見えるように残す。
+     *
+     * @param path パス
+     * @return 表示するパス
+     */
     private fun makePathString(path: String): String {
         if (!::binding.isInitialized) return path
         val prevPath = prevPath
@@ -150,6 +180,11 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
         }
     }
 
+    /**
+     * @brief 進捗バー、パーセンテージ、詳細の表示を更新する。
+     *
+     * 階層が 40 を超えたら、循環したディレクトリの可能性を警告する。
+     */
     private fun onProgressChanged() {
         if (!::binding.isInitialized) return
         // Update the number and percent
@@ -170,18 +205,29 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
         }
     }
 
+    /**
+     * @brief ファイルのスキャンの進捗を設定する。
+     * @param progress 現在の段階の進捗
+     * @param entry 最後にスキャンした項目(パスを表示する)
+     */
     fun setProgress(progress: Long, entry: FileSystemEntry) {
         this.progress = progress
         details = makePathString(path(entry))
         onProgressChanged()
     }
 
+    /**
+     * @brief 進捗と詳細の文字列を設定する(アプリの読み込みなど)。
+     * @param progress 現在の段階の進捗
+     * @param details 表示する詳細(アプリ名など)
+     */
     fun setProgress(progress: Long, details: CharSequence) {
         this.progress = progress
         this.details = details
         onProgressChanged()
     }
 
+    /** @brief 進捗の表示を作る(バーは 0〜10000 で表す)。 */
     override fun onCreate(savedInstanceState: Bundle?) {
         binding = ProgressBinding.inflate(layoutInflater)
         binding.progress.max = 10000

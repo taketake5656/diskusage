@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file SelectActivity.kt
+ * @brief 起動時の、表示するストレージの選択画面。
+ */
 package com.google.android.diskusage.ui
 
 import android.app.AlertDialog
@@ -36,15 +40,20 @@ import com.google.android.diskusage.utils.DeviceHelper
 import com.google.android.diskusage.utils.IOHelper
 import timber.log.Timber
 
-/** Lets the user select the storage to view. */
+/**
+ * @brief 表示するストレージを選ぶ画面(ランチャーから起動する)。
+ *
+ * ストレージの一覧をダイアログで表示する。root 化した端末ではマウントポイントも選べる。
+ */
 class SelectActivity : ComponentActivity() {
     private var dialog: AlertDialog? = null
 
-    /** Saved states of the viewed storages. */
+    /** @brief 表示したストレージごとの保存状態(戻ってきたときに復元する)。 */
     private val bundles = sortedMapOf<String, Bundle?>()
     private var expandRootMountPoints = false
     private val handler = Handler(Looper.getMainLooper())
 
+    /** @brief メイン画面を起動し、閉じたときにその表示状態を受け取る。 */
     private val diskUsage =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val data = result.data ?: return@registerForActivityResult
@@ -52,6 +61,7 @@ class SelectActivity : ComponentActivity() {
             bundles[key] = data.getBundleExtra(DiskUsage.STATE_KEY)
         }
 
+    /** @brief 2 秒ごとに /proc/mounts を確認し、マウントが変わったら一覧を作り直す。 */
     private val checkForMountsUpdates = object : Runnable {
         override fun run() {
             val checksum = try {
@@ -68,6 +78,10 @@ class SelectActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * @brief ストレージを表示する(権限の確認画面を経由してメイン画面を開く)。
+     * @param mountPoint 表示するストレージ
+     */
     private fun view(mountPoint: MountPoint) {
         val intent = Intent(this, PermissionRequestActivity::class.java)
             .putExtra(DiskUsage.KEY_KEY, mountPoint.key)
@@ -75,10 +89,17 @@ class SelectActivity : ComponentActivity() {
         diskUsage.launch(intent)
     }
 
+    /** @brief マウントポイントの表示・非表示の設定画面を開く。 */
     private fun showHideMountPoints() {
         startActivity(Intent(this, ShowHideMountPointsActivity::class.java))
     }
 
+    /**
+     * @brief ストレージの選択ダイアログを作り直して表示する。
+     *
+     * root 化した端末では、最初は「root 権限が必要」の項目だけを出し、選ぶか非表示の設定が
+     * あればマウントポイントを並べる。ダイアログを閉じると画面も閉じる。
+     */
     private fun makeDialog() {
         val options = mutableListOf<Pair<String, () -> Unit>>()
         for (mountPoint in MountPoint.getMountPoints(this)) {
@@ -109,18 +130,21 @@ class SelectActivity : ComponentActivity() {
             .show()
     }
 
+    /** @brief 表示用の文字列を準備し、空の画面を表示する。 */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileSystemEntry.setupStrings(this)
         setContentView(ActivityCommonBinding.inflate(layoutInflater).root)
     }
 
+    /** @brief 選択ダイアログを表示し、マウントの監視を始める。 */
     override fun onResume() {
         super.onResume()
         makeDialog()
         handler.post(checkForMountsUpdates)
     }
 
+    /** @brief ダイアログを閉じ、マウントの監視を止める。 */
     override fun onPause() {
         dialog?.dismiss()
         dialog = null
@@ -128,6 +152,7 @@ class SelectActivity : ComponentActivity() {
         super.onPause()
     }
 
+    /** @brief ストレージごとの表示状態を保存する。 */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         for ((key, bundle) in bundles) {
@@ -136,6 +161,7 @@ class SelectActivity : ComponentActivity() {
         outState.putStringArray(BUNDLE_KEYS, bundles.keys.toTypedArray())
     }
 
+    /** @brief ストレージごとの表示状態を復元する。 */
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
         for (key in savedInstanceState.getStringArray(BUNDLE_KEYS).orEmpty()) {

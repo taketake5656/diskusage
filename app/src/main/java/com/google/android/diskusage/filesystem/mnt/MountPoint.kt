@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file MountPoint.kt
+ * @brief スキャンできるストレージ(マウントポイント)の一覧。
+ */
 package com.google.android.diskusage.filesystem.mnt
 
 import android.content.Context
@@ -24,21 +28,30 @@ import com.google.android.diskusage.R
 import com.google.android.diskusage.datasource.fast.PortableFileImpl
 import timber.log.Timber
 
-/** Storage volume which can be scanned. */
+/**
+ * @brief スキャンできるストレージ(内部共有ストレージや SD カード)。
+ * @param title 選択画面に出す名前
+ * @param root ストレージのルートのパス
+ * @param forceHasApps true ならアプリの容量も表示し、削除もできる(内部共有ストレージ)
+ */
 open class MountPoint internal constructor(
     val title: String,
     val root: String,
     private val forceHasApps: Boolean,
 ) {
+    /** @brief スキャンに root 権限が必要かどうか。 */
     open val isRootRequired: Boolean
         get() = false
 
+    /** @brief ファイルを削除できるかどうか。 */
     open val isDeleteSupported: Boolean
         get() = forceHasApps
 
+    /** @brief 画面間で受け渡すための識別子。 */
     open val key: String
         get() = "storage:$root"
 
+    /** @brief アプリの容量もツリーに含めるかどうか。 */
     open val hasApps: Boolean
         get() = forceHasApps
 
@@ -47,17 +60,35 @@ open class MountPoint internal constructor(
         private var mountPointForKey = mapOf<String, MountPoint>()
         private var initialized = false
 
+        /**
+         * @brief 識別子からマウントポイントを探す(root 用のものも含む)。
+         * @param context Context
+         * @param key MountPoint.key の値
+         * @return 見つかったマウントポイント。なければ null
+         */
         fun getForKey(context: Context, key: String): MountPoint? {
             initMountPoints(context)
             return mountPointForKey[key] ?: RootMountPoint.getForKey(key)
         }
 
+        /**
+         * @brief ストレージの一覧を返す(root 用の一覧の準備も行う)。
+         * @param context Context
+         * @return ストレージの一覧
+         */
         fun getMountPoints(context: Context): List<MountPoint> {
             initMountPoints(context)
             RootMountPoint.initMountPoints()
             return mountPoints
         }
 
+        /**
+         * @brief アプリ専用ディレクトリの場所からストレージの一覧を作る(初回だけ)。
+         *
+         * 取り外しできないストレージを内部共有ストレージとして扱う。
+         *
+         * @param context Context
+         */
         private fun initMountPoints(context: Context) {
             if (initialized) return
             initialized = true
@@ -73,6 +104,7 @@ open class MountPoint internal constructor(
             mountPointForKey = mountPoints.associateBy { it.key }
         }
 
+        /** @brief 一覧を破棄し、次の取得で作り直すようにする(root 用の一覧も)。 */
         fun reset() {
             mountPoints = listOf()
             mountPointForKey = mapOf()

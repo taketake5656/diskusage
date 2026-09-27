@@ -17,6 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/**
+ * @file LoadableActivity.kt
+ * @brief ファイルシステムをバックグラウンドでスキャンする画面の基底クラス。
+ */
 package com.google.android.diskusage.ui
 
 import android.os.Bundle
@@ -33,38 +37,66 @@ import kotlin.concurrent.thread
 import splitties.toast.toast
 import timber.log.Timber
 
-/** Called with the scanned file system tree. */
+/** @brief スキャンしたツリーを受け取る処理。 */
 fun interface AfterLoad {
+    /**
+     * @brief スキャンしたツリーを受け取る(メインスレッド)。
+     * @param root ツリーのルート
+     * @param isCached true なら前回のスキャン結果を使い回したもの
+     */
     fun run(root: FileSystemSuperRoot, isCached: Boolean)
 }
 
 /**
- * Activity which scans the file system in the background. The scan results
- * survive recreation of the activity.
+ * @brief ファイルシステムをバックグラウンドでスキャンする画面の基底クラス。
+ *
+ * スキャンの結果と進行中のスキャンは、画面の再作成(回転など)をまたいで保たれる。
  */
 abstract class LoadableActivity : AppCompatActivity() {
+    /** @brief メインスレッドのハンドラ。 */
     val handler = Handler(Looper.getMainLooper())
+    /** @brief 詳細設定を開いたアプリ(戻ったときにアンインストールされたかを確認する)。 */
     var pkgRemoved: FileSystemPackage? = null
 
+    /** @brief 表示しているストレージの識別子(スキャン結果の保存先のキー)。 */
     abstract val key: String
 
-    /** Runs on a background thread. */
+    /**
+     * @brief スキャンを実行する(バックグラウンドのスレッドで呼ばれる)。
+     * @return ツリーのルート
+     */
     protected abstract fun scan(): FileSystemSuperRoot
 
+    /** @brief 画面の再作成をまたいで保つ、ストレージごとの状態。 */
     class PersistentActivityState {
+        /** @brief 表示中の進捗ダイアログ。 */
         var loading: ScanProgressDialog? = null
+        /** @brief スキャンしたツリー。 */
         var root: FileSystemSuperRoot? = null
+        /** @brief スキャンの完了後に呼ぶ処理(スキャン中だけ設定される)。 */
         var afterLoad: AfterLoad? = null
     }
 
+    /** @brief このストレージの状態。 */
     val persistentState: PersistentActivityState
         get() = persistentActivityStates.getOrPut(key) { PersistentActivityState() }
 
+    /** @brief 表示用の文字列を準備する。 */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileSystemEntry.setupStrings(this)
     }
 
+    /**
+     * @brief ツリーを読み込む。前回の結果があればそれを使い、なければスキャンを始める。
+     *
+     * スキャン中は進捗ダイアログを表示し、取り消されたら画面を閉じる。
+     * 既にスキャン中なら、ダイアログを出し直して完了後の処理だけを差し替える。
+     * メモリ不足やエラーのときはダイアログで知らせる。
+     *
+     * @param afterLoad 読み込み後の処理
+     * @param force true なら前回の結果を捨ててスキャンし直す
+     */
     protected fun loadFiles(afterLoad: AfterLoad, force: Boolean) {
         val state = persistentState
         Timber.d("LoadableActivity.loadFiles(), afterLoad = %s", afterLoad)
@@ -128,6 +160,15 @@ abstract class LoadableActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * @brief スキャンの完了を受け取る(メインスレッド)。
+     *
+     * ダイアログが既に閉じられていれば(画面が裏にある)結果だけ保存する。
+     * ストレージが空なら再スキャンを促す。
+     *
+     * @param state このストレージの状態
+     * @param newRoot スキャンしたツリー
+     */
     private fun onScanFinished(state: PersistentActivityState, newRoot: FileSystemSuperRoot) {
         val loading = state.loading
         val afterLoad = state.afterLoad
@@ -155,6 +196,7 @@ abstract class LoadableActivity : AppCompatActivity() {
         afterLoad!!.run(newRoot, false)
     }
 
+    /** @brief メモリ不足をダイアログ(表示できなければトースト)で知らせる。 */
     private fun handleOutOfMemory() {
         try {
             // Can fail if the main window is already closed.
@@ -167,6 +209,7 @@ abstract class LoadableActivity : AppCompatActivity() {
         }
     }
 
+    /** @brief 進捗ダイアログを閉じる(スキャンは続け、結果は保存される)。 */
     override fun onPause() {
         persistentState.loading?.let {
             if (it.isShowing) it.dismiss()
@@ -176,6 +219,10 @@ abstract class LoadableActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    /**
+     * @brief ストレージが空か見つからないことを知らせ、再スキャンを選べるようにする。
+     * @param afterLoad 再スキャン後の処理
+     */
     private fun handleEmptySDCard(afterLoad: AfterLoad) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.empty_or_missing_sdcard))
@@ -185,6 +232,7 @@ abstract class LoadableActivity : AppCompatActivity() {
     }
 
     private companion object {
+        /** @brief ストレージの識別子ごとの状態(プロセスが生きている間保つ)。 */
         val persistentActivityStates = mutableMapOf<String, PersistentActivityState>()
     }
 }

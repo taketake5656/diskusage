@@ -16,6 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+/**
+ * @file FileInfoAdapter.kt
+ * @brief 削除確認画面のファイル一覧のアダプター。
+ */
 package com.google.android.diskusage.ui.common
 
 import android.view.LayoutInflater
@@ -26,10 +30,24 @@ import androidx.viewbinding.ViewBinding
 import com.google.android.diskusage.databinding.ListDirItemBinding
 import com.google.android.diskusage.databinding.ListFileItemBinding
 
+/**
+ * @brief 削除確認画面のファイル一覧のアダプター。
+ *
+ * サイズが空の行はディレクトリ、それ以外はファイルとして別のレイアウトで表示する。
+ *
+ * @param infos 表示する行
+ */
 class FileInfoAdapter(private val infos: List<FileInfo>) :
     RecyclerView.Adapter<FileInfoAdapter.ViewHolder>() {
+    /** @brief 1 行分のビュー。 @param ui 行のレイアウト */
     class ViewHolder(val ui: ViewBinding) : RecyclerView.ViewHolder(ui.root)
 
+    /**
+     * @brief 行のビューを作る。
+     * @param parent 親のビュー
+     * @param viewType 0 ならファイル、1 ならディレクトリ
+     * @return 作成したビュー
+     */
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         val ui = if (viewType == 0) {
@@ -44,6 +62,11 @@ class FileInfoAdapter(private val infos: List<FileInfo>) :
         return ViewHolder(ui)
     }
 
+    /**
+     * @brief 行に名前とサイズを表示する。
+     * @param holder 行のビュー
+     * @param position 行の位置
+     */
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val fileInfo = infos[position]
         if (fileInfo.size.isEmpty()) {
@@ -58,15 +81,22 @@ class FileInfoAdapter(private val infos: List<FileInfo>) :
     }
 
 
+    /** @brief 行数を返す。 */
     override fun getItemCount(): Int {
         return infos.size
     }
 
+    /**
+     * @brief 行の種類を返す。
+     * @param position 行の位置
+     * @return 0 ならファイル、1 ならディレクトリ
+     */
     override fun getItemViewType(position: Int): Int {
         val fileInfo = infos[position]
         return if ((fileInfo.size.isEmpty())) 1 else 0
     }
 
+    /** @brief 行の位置をそのまま ID にする。 */
     override fun getItemId(position: Int): Long {
         return position.toLong()
     }
