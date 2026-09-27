@@ -61,26 +61,43 @@ class RootMountPoint private constructor(root: String) : MountPoint(root, root, 
 
             try {
                 checksum = 0
-                val mountPoints = mutableListOf<MountPoint>()
+                // Shortest mount point of each device: bind mounts show the same files again
+                val mountPointForDevice = LinkedHashMap<String, String>()
                 IOHelper.getProcMountsReader().useLines { lines ->
                     for (line in lines) {
                         checksum += line.length
-                        Timber.d("initMountPoints: Line: %s", line)
                         val parts = line.split(Regex(" +"))
                         if (parts.size < 3) continue
-                        val mountPoint = parts[1]
-                        Timber.d("initMountPoints: Mount point: %s", mountPoint)
-                        if (!mountPoint.startsWith("/mnt/asec/")) {
-                            mountPoints += RootMountPoint(mountPoint)
+                        val (device, mountPoint, type) = parts
+                        if (!isStorage(mountPoint, type)) continue
+                        val known = mountPointForDevice[device]
+                        if (known == null || mountPoint.length < known.length) {
+                            mountPointForDevice[device] = mountPoint
                         }
                     }
                 }
+                Timber.d("initMountPoints: %s", mountPointForDevice)
+                val mountPoints = mountPointForDevice.values.map { RootMountPoint(it) }
                 rootedMountPoints = mountPoints
                 rootedMountPointForKey = mountPoints.associateBy { it.key }
             } catch (e: Exception) {
                 Timber.e(e, "initMountPoints: Failed to get mount points")
             }
         }
+
+        /** File systems without files stored on the device. */
+        private val virtualTypes = setOf(
+            "autofs", "binder", "binderfs", "bpf", "cgroup", "cgroup2", "configfs", "debugfs",
+            "devpts", "devtmpfs", "efivarfs", "functionfs", "fuse", "fusectl", "incremental-fs",
+            "mqueue", "nsfs", "overlay", "proc", "pstore", "rootfs", "sdcardfs", "securityfs",
+            "selinuxfs", "sysfs", "tmpfs", "tracefs",
+        )
+
+        /** Mount point prefixes of the many small APEX images. */
+        private val ignoredPrefixes = listOf("/apex/", "/bootstrap-apex/", "/mnt/asec/")
+
+        private fun isStorage(mountPoint: String, type: String): Boolean =
+            type !in virtualTypes && ignoredPrefixes.none { mountPoint.startsWith(it) }
 
         fun reset() {
             rootedMountPoints = listOf()
