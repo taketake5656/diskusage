@@ -1,18 +1,20 @@
 package com.google.android.diskusage.ui
 
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.os.Bundle
 import android.os.Process
-import android.text.Html
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.SearchView
 import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
+import androidx.core.text.HtmlCompat
 import androidx.core.view.forEach
 import com.google.android.diskusage.R
 import com.google.android.diskusage.databinding.AboutDialogBinding
@@ -24,6 +26,7 @@ import com.google.android.diskusage.filesystem.mnt.MountPoint
 import com.google.android.diskusage.utils.AppIconCache.getOrLoadBitmap
 import com.google.android.diskusage.utils.item
 import splitties.resources.styledColor
+import splitties.toast.toast
 import timber.log.Timber
 
 class DiskUsageMenu(val diskusage: DiskUsage) {
@@ -174,22 +177,21 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
                         diskusage
                     ), null, false
                 )
-            binding.sourceCode.text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                Html.fromHtml(
-                    diskusage.getString(
-                        R.string.about_view_source_code,
-                        "<b><a href=\"https://github.com/taketake5656/diskusage\">GitHub</a></b>"
-                    ),
-                    Html.FROM_HTML_MODE_LEGACY
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                Html.fromHtml(
-                    diskusage.getString(
-                        R.string.about_view_source_code,
-                        "<b><a href=\"https://github.com/taketake5656/diskusage\">GitHub</a></b>"
-                    )
-                )
+            binding.sourceCode.text = HtmlCompat.fromHtml(
+                diskusage.getString(
+                    R.string.about_view_source_code,
+                    "<b><a href=\"$SOURCE_CODE_URL\">GitHub</a></b>"
+                ),
+                HtmlCompat.FROM_HTML_MODE_LEGACY
+            )
+            // Only styled as a link by the HTML, so open it in the browser on a tap
+            binding.sourceCode.setOnClickListener {
+                try {
+                    diskusage.startActivity(Intent(Intent.ACTION_VIEW, SOURCE_CODE_URL.toUri()))
+                } catch (e: ActivityNotFoundException) {
+                    Timber.w(e, "No browser to open %s", SOURCE_CODE_URL)
+                    diskusage.toast(R.string.no_viewer_found)
+                }
             }
             binding.icon.setImageBitmap(
                 getOrLoadBitmap(
@@ -242,5 +244,9 @@ class DiskUsageMenu(val diskusage: DiskUsage) {
         } else {
             viewModel.disableDeleteButton()
         }
+    }
+
+    private companion object {
+        const val SOURCE_CODE_URL = "https://github.com/taketake5656/diskusage"
     }
 }
