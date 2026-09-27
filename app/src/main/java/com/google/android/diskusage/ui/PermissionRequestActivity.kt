@@ -104,7 +104,7 @@ class PermissionRequestActivity : ComponentActivity() {
                 .setTitle(R.string.dialog_usage_access_title)
                 .setMessage(R.string.dialog_usage_access_desc)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
-                    settings.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    requestUsageAccess()
                 }
                 .setNegativeButton(android.R.string.cancel) { _, _ -> forwardToDiskUsage() }
                 .setOnCancelListener { forwardToDiskUsage() }
@@ -142,6 +142,17 @@ class PermissionRequestActivity : ComponentActivity() {
         } catch (e: ActivityNotFoundException) {
             Timber.d(e, "failed to obtain all files access")
             settings.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+        }
+    }
+
+    private fun requestUsageAccess() {
+        // The setting of this app, instead of the list of all the apps (Android 10+)
+        try {
+            settings.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                .setData("package:$packageName".toUri()))
+        } catch (e: ActivityNotFoundException) {
+            Timber.d(e, "failed to open the usage access setting of the app")
+            settings.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         }
     }
 
