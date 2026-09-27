@@ -43,10 +43,23 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
     private var depth = 0
     private var warned = false
     private var prevPath = ""
-    private var basePercent = 1.0
+    // The scan runs in phases (files, then apps), each filling a part of the bar
+    private var phaseStart = 0.0
+    private var phaseEnd = 1.0
+    private var shownFraction = 0.0
 
     fun setMax(max: Long) {
         this.max = max
+    }
+
+    /**
+     * Starts the next phase, which fills the bar from where it is up to [end].
+     * The progress of the phase is counted from zero again.
+     */
+    fun startPhase(end: Double) {
+        phaseStart = shownFraction
+        phaseEnd = end.coerceIn(phaseStart, 1.0)
+        progress = 0
     }
 
     private fun path(entry: FileSystemEntry): String {
@@ -140,7 +153,12 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
     private fun onProgressChanged() {
         if (!::binding.isInitialized) return
         // Update the number and percent
-        val percent = progress.toDouble() / max.toDouble() * basePercent + (1 - basePercent)
+        // The size to scan is only an estimate: files may be counted, which aren't
+        // in the used blocks of the file system, so never pass the end of the phase
+        // and never go back.
+        val phaseFraction = if (max > 0) (progress.toDouble() / max).coerceIn(0.0, 1.0) else 0.0
+        shownFraction = maxOf(shownFraction, phaseStart + (phaseEnd - phaseStart) * phaseFraction)
+        val percent = shownFraction
         binding.progress.progress = (percent * 10000).toInt()
         binding.progressDetails.text = details
         binding.progressPercent.text = SpannableString(progressPercentFormat.format(percent)).apply {
@@ -162,10 +180,6 @@ class ScanProgressDialog(context: Context) : AlertDialog(context) {
         this.progress = progress
         this.details = details
         onProgressChanged()
-    }
-
-    fun switchToSecondary() {
-        basePercent = 1 - progress.toDouble() / max.toDouble()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

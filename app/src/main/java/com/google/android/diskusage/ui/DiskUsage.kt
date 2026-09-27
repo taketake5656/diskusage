@@ -20,10 +20,13 @@
 package com.google.android.diskusage.ui
 
 import android.app.ActivityManager
+import android.app.usage.StorageStatsManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
+import android.os.storage.StorageManager
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
@@ -339,15 +342,21 @@ class DiskUsage : LoadableActivity() {
     /** Periodically updates the progress dialog while scanning. */
     private inline fun <T> withProgress(
         scanner: ProgressGenerator,
-        stats: FileSystemStats,
+        blocksToScan: Long,
+        phaseEnd: Double,
         scan: () -> T,
     ): T {
         val progressUpdater = object : Runnable {
             private var file: FileSystemEntry? = null
+            private var phaseStarted = false
 
             override fun run() {
                 persistentState.loading?.let { dialog ->
-                    dialog.setMax(stats.busyBlocks)
+                    if (!phaseStarted) {
+                        dialog.startPhase(phaseEnd)
+                        phaseStarted = true
+                    }
+                    dialog.setMax(blocksToScan)
                     val lastFile = scanner.lastCreatedFile
                     if (lastFile != null && lastFile !== file) {
                         dialog.setProgress(scanner.pos, lastFile)
@@ -373,19 +382,40 @@ class DiskUsage : LoadableActivity() {
         }
     }
 
+    /**
+     * Blocks the file scan is expected to find. The used blocks of the file system
+     * are too many for the internal storage, which is only a part of /data.
+     */
+    private fun estimateBlocksToScan(mountPoint: MountPoint, stats: FileSystemStats): Long {
+        if (mountPoint.hasApps && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val bytes = getSystemService<StorageStatsManager>()!!
+                    .queryExternalStatsForUser(StorageManager.UUID_DEFAULT, Process.myUserHandle())
+                    .totalBytes
+                if (bytes > 0) return bytes / stats.blockSize
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to get the size of the external storage")
+            }
+        }
+        return stats.busyBlocks
+    }
+
     override fun scan(): FileSystemSuperRoot {
         val mountPoint = MountPoint.getForKey(this, key)!!
         val stats = FileSystemStats(mountPoint)
         val heap = memoryQuota
+        val blocksToScan = estimateBlocksToScan(mountPoint, stats)
+        // The apps are loaded after the files and take some time as well
+        val filesPhaseEnd = if (mountPoint.hasApps) FILES_PHASE_WITH_APPS else 1.0
 
         val rootElement = try {
             val scanner = NativeScanner(stats.blockSize, stats.busyBlocks, heap, smallEntryName)
-            withProgress(scanner, stats) { scanner.scan(mountPoint) }
+            withProgress(scanner, blocksToScan, filesPhaseEnd) { scanner.scan(mountPoint) }
         } catch (e: Exception) {
             if (e !is RuntimeException && e !is IOException) throw e
             Timber.w(e, "Native scanner failed, falling back to Java scanner")
             val scanner = Scanner(20, stats.blockSize, stats.busyBlocks, heap, smallEntryName)
-            withProgress(scanner, stats) {
+            withProgress(scanner, blocksToScan, filesPhaseEnd) {
                 scanner.scan(LegacyFileImpl.createRoot(mountPoint.root))
             }
         }
@@ -492,6 +522,13 @@ class DiskUsage : LoadableActivity() {
 
         const val STATE_KEY = "state"
         const val KEY_KEY = "key"
+
+        /**
+         * Part of the progress bar for the files, when the apps are loaded after them.
+         * Loading the apps takes longer: 12 s for 731 apps against 1.6 s for 23 GiB of
+         * files on a POCO F6 with cold caches.
+         */
+        private const val FILES_PHASE_WITH_APPS = 0.25
 
         const val DELETE_PATH_KEY = "path"
         const val DELETE_ABSOLUTE_PATH_KEY = "absolute_path"

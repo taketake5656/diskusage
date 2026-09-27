@@ -53,13 +53,13 @@ class Apps2SDLoader(private val diskUsage: DiskUsage) {
 
         val handler = diskUsage.handler
         val progressUpdater = object : Runnable {
-            private var switchToSecondary = true
+            private var phaseStarted = false
 
             override fun run() {
                 diskUsage.persistentState.loading?.let { dialog ->
-                    if (switchToSecondary) {
-                        dialog.switchToSecondary()
-                        switchToSecondary = false
+                    if (!phaseStarted) {
+                        dialog.startPhase(1.0)
+                        phaseStarted = true
                     }
                     dialog.setMax(packages.size.toLong())
                     dialog.setProgress(numLoadedPackages.toLong(), lastAppName)
