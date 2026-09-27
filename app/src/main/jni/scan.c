@@ -11,6 +11,44 @@
 dev_t dev;
 static const int sep = 0;
 
+/*
+ * Inodes seen so far, so that directories reached twice through bind mounts
+ * (e.g. /data/user/0 is /data/data) and hard linked files are counted once.
+ */
+static ino_t *seen;
+static size_t seenCapacity;
+static size_t seenCount;
+
+/* Returns 1 if the inode was seen before, otherwise remembers it. */
+static int check_seen(ino_t ino) {
+  if (seenCount * 2 >= seenCapacity) {
+    size_t oldCapacity = seenCapacity;
+    ino_t *old = seen;
+    seenCapacity = oldCapacity ? oldCapacity * 2 : 4096;
+    seen = calloc(seenCapacity, sizeof(ino_t));
+    if (seen == NULL) {
+      seen = old;
+      seenCapacity = oldCapacity;
+      return 0;
+    }
+    seenCount = 0;
+    for (size_t i = 0; i < oldCapacity; i++) {
+      if (old[i] != 0) check_seen(old[i]);
+    }
+    free(old);
+  }
+  /* Inode 0 isn't used by filesystems, so it marks empty slots. */
+  if (ino == 0) return 0;
+  size_t i = (size_t) (ino * 0x9E3779B97F4A7C15ULL) & (seenCapacity - 1);
+  while (seen[i] != 0) {
+    if (seen[i] == ino) return 1;
+    i = (i + 1) & (seenCapacity - 1);
+  }
+  seen[i] = ino;
+  seenCount++;
+  return 0;
+}
+
 struct Entity {
   long long sizeInBlocks;
   long long sizeInBytes;
@@ -89,6 +127,9 @@ struct Entity *make_entity(const char *path) {
   if (stbuf.st_dev != dev) {
     return NULL;
   }
+  if ((S_ISDIR(stbuf.st_mode) || stbuf.st_nlink > 1) && check_seen(stbuf.st_ino)) {
+    return NULL;
+  }
   return make_entity_internal(path, &stbuf);
 }
 
@@ -165,6 +206,7 @@ void scan_tree(const char *path) {
     return;
   }
   dev = stbuf.st_dev;
+  check_seen(stbuf.st_ino);
   scan_dir(path, make_entity_internal(path, &stbuf));
 }
 
