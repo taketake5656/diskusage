@@ -1,6 +1,8 @@
 /*
  * DiskUsage - displays sdcard usage on android.
  * (C) 2008-2011 Ivan Volosyuk
+ * Copyright (C) 2026 taketake5656
+ *   2026: written for this fork, based on the original code
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License

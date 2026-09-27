@@ -1,6 +1,8 @@
 /*
  * DiskUsage - displays sdcard usage on android.
  * Copyright (C) 2008 Ivan Volosyuk
+ * Copyright (C) 2026 taketake5656
+ *   2026: converted to Kotlin and modified (see the Git history)
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
