@@ -17,8 +17,8 @@ android {
         minSdk = 23
         targetSdk = 37
         // major * 10000 + minor * 100 + patch
-        versionCode = 10103
-        versionName = "1.1.3"
+        versionCode = 10104
+        versionName = "1.1.4"
     }
 
     buildFeatures {
