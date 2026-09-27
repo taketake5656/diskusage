@@ -72,6 +72,7 @@
     <string name="usage_info_unknown">Utilisé : &lt;aucune information&gt;</string>
     <string name="show_hide_mount_points">[Afficher/masquer]</string>
     <string name="root_required">[Root requis]</string>
+    <string name="root_denied">L\'accès root n\'a pas été accordé. Autorisez DiskUsage dans votre application de gestion du root (par ex. Magisk).</string>
     <string name="setup_visible_mount_points">Choisir les points de montage visibles</string>
     <string name="directory_to_delete_not_found">Oups. Impossible de trouver le répertoire à supprimer.</string>
     <string name="delete_directory_instead">Supprimez plutôt le répertoire</string>

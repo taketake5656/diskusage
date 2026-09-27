@@ -72,6 +72,7 @@
     <string name="usage_info_unknown">已使用 &lt;無資訊&gt;</string>
     <string name="show_hide_mount_points">[顯示/隱藏]</string>
     <string name="root_required">[需要 root]</string>
+    <string name="root_denied">未取得 root 權限。請在 root 管理應用程式（例如 Magisk）中允許 DiskUsage。</string>
     <string name="setup_visible_mount_points">設定可見的掛載點</string>
     <string name="directory_to_delete_not_found">找不到要刪除的資料夾。</string>
     <string name="delete_directory_instead">請改為刪除資料夾</string>

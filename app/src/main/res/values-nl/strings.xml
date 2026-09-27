@@ -70,6 +70,7 @@
     <string name="usage_info_unknown">Gebruikt: &lt;geen informatie&gt;</string>
     <string name="show_hide_mount_points">[Tonen/verbergen]</string>
     <string name="root_required">[Root vereist]</string>
+    <string name="root_denied">Roottoegang is niet verleend. Sta DiskUsage toe in je root-beheerapp (bijv. Magisk).</string>
     <string name="setup_visible_mount_points">Zichtbare koppelpunten instellen</string>
     <string name="directory_to_delete_not_found">Oeps. De te verwijderen map is niet gevonden.</string>
     <string name="delete_directory_instead">Verwijder in plaats daarvan de map</string>

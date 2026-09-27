@@ -70,6 +70,7 @@
     <string name="usage_info_unknown">Usado &lt;sin información&gt;</string>
     <string name="show_hide_mount_points">[Mostrar/ocultar]</string>
     <string name="root_required">[Requiere root]</string>
+    <string name="root_denied">No se concedió el acceso root. Permite DiskUsage en tu aplicación de gestión de root (p. ej., Magisk).</string>
     <string name="setup_visible_mount_points">Configurar los puntos de montaje visibles</string>
     <string name="directory_to_delete_not_found">Vaya. No se encuentra el directorio a borrar.</string>
     <string name="delete_directory_instead">Borre el directorio en su lugar</string>

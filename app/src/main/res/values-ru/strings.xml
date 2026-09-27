@@ -70,6 +70,7 @@
     <string name="usage_info_unknown">Занято: &lt;нет данных&gt;</string>
     <string name="show_hide_mount_points">[Показать/скрыть]</string>
     <string name="root_required">[Требуется root]</string>
+    <string name="root_denied">Root-доступ не предоставлен. Разрешите DiskUsage в приложении для управления root (например, Magisk).</string>
     <string name="setup_visible_mount_points">Выбор отображаемых точек монтирования</string>
     <string name="directory_to_delete_not_found">Не удалось найти папку для удаления.</string>
     <string name="delete_directory_instead">Удалите папку целиком</string>

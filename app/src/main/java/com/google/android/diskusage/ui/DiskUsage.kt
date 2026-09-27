@@ -47,6 +47,7 @@ import com.google.android.diskusage.core.Scanner
 import com.google.android.diskusage.core.SmallEntryName
 import com.google.android.diskusage.databinding.ActivityCommonBinding
 import com.google.android.diskusage.datasource.fast.LegacyFileImpl
+import com.google.android.diskusage.datasource.fast.RootDeniedException
 import com.google.android.diskusage.filesystem.Apps2SDLoader
 import com.google.android.diskusage.filesystem.BackgroundDelete
 import com.google.android.diskusage.filesystem.FileSystemStats
@@ -414,6 +415,16 @@ class DiskUsage : LoadableActivity() {
         } catch (e: Exception) {
             if (e !is RuntimeException && e !is IOException) throw e
             Timber.w(e, "Native scanner failed, falling back to Java scanner")
+            if (e is RootDeniedException) {
+                handler.post {
+                    if (!isFinishing) {
+                        AlertDialog.Builder(this)
+                            .setMessage(R.string.root_denied)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                }
+            }
             val scanner = Scanner(20, stats.blockSize, stats.busyBlocks, heap, smallEntryName)
             withProgress(scanner, blocksToScan, filesPhaseEnd) {
                 scanner.scan(LegacyFileImpl.createRoot(mountPoint.root))

@@ -6,6 +6,9 @@ import org.jetbrains.annotations.Contract
 import java.io.IOException
 import java.io.InputStream
 
+/** Thrown when a scan needs root, but `su` is missing or the user denied it. */
+class RootDeniedException : IOException("Root access is unavailable or was denied")
+
 class NativeScannerStream(private val process: Process) :
     InputStream() {
     private val input = process.inputStream
@@ -52,7 +55,7 @@ class NativeScannerStream(private val process: Process) :
             val process = if (!rootRequired) {
                 Runtime.getRuntime().exec(arrayOf(libscanPath, root))
             } else {
-                val su = RootShell.findSu() ?: throw IOException("Root access is unavailable or was denied")
+                val su = RootShell.findSu() ?: throw RootDeniedException()
                 val command = "${RootShell.shellQuote(libscanPath)} ${RootShell.shellQuote(root)}"
                 Runtime.getRuntime().exec((su + listOf("-c", command)).toTypedArray())
             }

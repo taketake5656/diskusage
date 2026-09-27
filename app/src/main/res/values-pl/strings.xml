@@ -70,6 +70,7 @@
     <string name="usage_info_unknown">Zajęte: &lt;brak informacji&gt;</string>
     <string name="show_hide_mount_points">[Pokaż/ukryj]</string>
     <string name="root_required">[Wymagany root]</string>
+    <string name="root_denied">Nie przyznano dostępu root. Zezwól aplikacji DiskUsage w menedżerze roota (np. Magisk).</string>
     <string name="setup_visible_mount_points">Wybierz widoczne punkty montowania</string>
     <string name="directory_to_delete_not_found">Ups. Nie znaleziono katalogu do usunięcia.</string>
     <string name="delete_directory_instead">Usuń zamiast tego katalog</string>

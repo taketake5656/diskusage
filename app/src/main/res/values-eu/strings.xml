@@ -70,6 +70,7 @@
     <string name="usage_info_unknown">Erabilita: &lt;informaziorik ez&gt;</string>
     <string name="show_hide_mount_points">[Erakutsi/ezkutatu]</string>
     <string name="root_required">[Root behar da]</string>
+    <string name="root_denied">Ez da root sarbiderik eman. Baimendu DiskUsage root kudeatzeko aplikazioan (adib. Magisk).</string>
     <string name="setup_visible_mount_points">Konfiguratu muntatze-puntu ikusgaiak</string>
     <string name="directory_to_delete_not_found">Ezabatu beharreko direktorioa ez da aurkitu.</string>
     <string name="delete_directory_instead">Ezabatu direktorioa horren ordez</string>

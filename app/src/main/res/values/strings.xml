@@ -72,6 +72,7 @@
     <string name="usage_info_unknown">Used &lt;no information&gt;</string>
     <string name="show_hide_mount_points">[Show/hide]</string>
     <string name="root_required">[Root required]</string>
+    <string name="root_denied">Root access was not granted. Allow DiskUsage in your root manager app (e.g. Magisk).</string>
     <string name="setup_visible_mount_points">Setup visible mount points</string>
     <string name="directory_to_delete_not_found">Oops. Can\'t find directory to be deleted.</string>
     <string name="delete_directory_instead">Delete directory instead</string>

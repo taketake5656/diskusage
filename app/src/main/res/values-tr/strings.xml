@@ -70,6 +70,7 @@
     <string name="usage_info_unknown">Kullanılan: &lt;bilgi yok&gt;</string>
     <string name="show_hide_mount_points">[Göster/gizle]</string>
     <string name="root_required">[Root gerekli]</string>
+    <string name="root_denied">Root erişimi verilmedi. Root yönetim uygulamanızda (ör. Magisk) DiskUsage\'a izin verin.</string>
     <string name="setup_visible_mount_points">Görünür bağlama noktalarını ayarla</string>
     <string name="directory_to_delete_not_found">Hata. Silinecek dizin bulunamadı.</string>
     <string name="delete_directory_instead">Bunun yerine dizini silin</string>

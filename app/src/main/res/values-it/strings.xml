@@ -53,6 +53,7 @@ non esiste"</string>
     <string name="usage_info_unknown">Usato: &lt;nessuna informazione&gt;</string>
     <string name="show_hide_mount_points">[Mostra/nascondi]</string>
     <string name="root_required">[Root richiesto]</string>
+    <string name="root_denied">L\'accesso root non è stato concesso. Consenti DiskUsage nell\'app di gestione del root (ad es. Magisk).</string>
     <string name="setup_visible_mount_points">Imposta i punti di montaggio visibili</string>
     <string name="directory_to_delete_not_found">Ops. Impossibile trovare la cartella da eliminare.</string>
     <string name="delete_directory_instead">Elimina invece la cartella</string>
