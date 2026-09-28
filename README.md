@@ -1,4 +1,4 @@
-<img src="extra/icon512x512.png" width="96" alt="アイコン">
+<p align="center"><img src="extra/icon512x512.png" width="96" alt="アイコン"></p>
 
 DiskUsage
 =========
