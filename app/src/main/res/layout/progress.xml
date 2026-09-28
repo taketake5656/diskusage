@@ -16,6 +16,7 @@
 
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:paddingStart="10dip"
@@ -42,16 +43,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/progress" />
 
+    <!-- No fallback line spacing, so the height doesn't change with the text:
+         e.g. Japanese app names use a fallback font with a taller line -->
     <TextView
         android:id="@+id/progress_details"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dip"
         android:ellipsize="none"
+        android:fallbackLineSpacing="false"
         android:gravity="start"
         android:paddingBottom="12dip"
         android:singleLine="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/progress_percent"
-        app:layout_constraintTop_toBottomOf="@id/progress" />
+        app:layout_constraintTop_toBottomOf="@id/progress"
+        tools:targetApi="p" />
 </androidx.constraintlayout.widget.ConstraintLayout>
